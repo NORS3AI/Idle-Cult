@@ -34,11 +34,39 @@ const ITEMS = [
   },
   {
     id: 'map', name: 'map', kind: 'once', base: 5800,
-    desc: 'Charts the hidden grove — unlocks the Ritual slate.',
+    desc: 'Charts the hidden grove — unlocks the Ritual slate and the Combat map.',
   },
   {
     id: 'notebook', name: 'notebook', kind: 'once', base: 7600,
-    desc: 'Forbidden notes reveal every rune pattern in the spellbook.',
+    desc: 'A grimoire — opens the Notebook tab to record every rite you know.',
+  },
+  {
+    id: 'research', name: 'research', kind: 'once', base: 10000,   // the "alembic" — opens Research
+    desc: 'An alembic for alchemical study — opens the Research tab.',
+  },
+  {
+    id: 'ledger', name: 'ledger', kind: 'once', base: 33300, info: true,
+    desc: 'Generates cash every second equal to 4% of the average crop value across your planters.',
+  },
+  {
+    id: 'grafting-kit', name: 'grafting kit', kind: 'once', base: 80000,
+    desc: 'Tools for splicing strains. (More uses coming soon.)',
+  },
+  {
+    id: 'auto-harvester', name: 'auto-harvester', kind: 'once', base: 250000,
+    desc: 'Automatically harvests and replants every planter, hands-free.',
+  },
+  {
+    id: 'thurible', name: 'thurible', kind: 'once', base: 750000, info: true,
+    desc: 'A swinging censer of sacred smoke. (Effect coming soon.)',
+  },
+  {
+    id: 'poultice', name: 'poultice', kind: 'once', base: 100000000, info: true,
+    desc: 'A healing salve for the wounded faithful. (Effect coming soon.)',
+  },
+  {
+    id: 'compass', name: 'compass', kind: 'once', base: 400000000, info: true,
+    desc: 'Points beyond the known map. (Effect coming soon.)',
   },
 ];
 
@@ -85,8 +113,18 @@ const SPELLS = [
 ];
 const SPELLS_BY_ID = Object.fromEntries(SPELLS.map(s => [s.id, s]));
 
+/* Top navigation tabs. Each (except home) unlocks when its item is owned. */
+const TABS = [
+  { id: 'home',     icon: '⌂', label: 'Grove',    needs: null },
+  { id: 'notebook', icon: '✒', label: 'Notebook', needs: 'notebook' },
+  { id: 'combat',   icon: '⚔', label: 'Combat',   needs: 'map' },
+  { id: 'research', icon: '⚗', label: 'Research', needs: 'research' },
+];
+
 const CONFIG = {
   startCents: 10,
+  ledgerRate: 0.04,              // 4% of average planted crop value per second
+
   baseSlots: 1,
   offlineCapSeconds: 8 * 3600,   // cap offline progress at 8 hours
   ritualUnlockItem: 'map',       // ritual slate unlocked by buying the map

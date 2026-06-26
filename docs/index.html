@@ -23,8 +23,10 @@
 
     <!-- header -->
     <header class="topbar">
-      <button id="homeBtn" class="home-btn" aria-label="home">⌂</button>
-      <div id="money" class="money">10¢</div>
+      <div class="money-wrap">
+        <div id="money" class="money">10¢</div>
+        <div id="rate" class="rate"></div>
+      </div>
       <div class="top-right">
         <span id="hasteBadge" class="haste-badge"></span>
         <span class="mult-chip">×<span id="mult">1</span></span>
@@ -32,35 +34,52 @@
       </div>
       <div id="menu" class="menu">
         <button id="menuReset">Abandon &amp; reset</button>
-        <div class="menu-note">Idle Cult · auto-saves locally</div>
+        <div class="menu-note">Idle Cult · auto-saves to this browser</div>
       </div>
     </header>
 
+    <!-- tab bar -->
+    <nav id="tabbar" class="tabbar"></nav>
+
     <main class="content">
-      <!-- BUY -->
-      <section class="card">
-        <h2 class="card-title">Buy</h2>
-        <button id="buyToggle" class="collapse-bar top"><span id="buyChevron" class="chevron">⌃</span></button>
-        <div id="buyList" class="list"></div>
-      </section>
+      <!-- HOME (Grove) -->
+      <div id="view-home" class="view">
+        <section class="card">
+          <h2 class="card-title">Buy</h2>
+          <button id="buyToggle" class="collapse-bar top"><span id="buyChevron" class="chevron">⌃</span></button>
+          <div id="buyList" class="list"></div>
+        </section>
 
-      <!-- SEEDS -->
-      <section class="card">
-        <h2 class="card-title">Seeds</h2>
-        <div id="seedList" class="list"></div>
-      </section>
+        <section class="card">
+          <h2 class="card-title">Seeds</h2>
+          <div id="seedList" class="list"></div>
+        </section>
 
-      <!-- PLANTERS -->
-      <section class="card">
-        <h2 class="card-title">Planters</h2>
-        <div id="planterList" class="list"></div>
-      </section>
+        <section class="card">
+          <h2 class="card-title">Planters</h2>
+          <div id="planterList" class="list"></div>
+        </section>
 
-      <!-- RITUAL -->
-      <section id="ritualCard" class="card ritual locked">
-        <h2 class="card-title">Ritual slate</h2>
-        <div id="ritualBody" class="ritual-body"></div>
-      </section>
+        <section id="ritualCard" class="card ritual locked">
+          <h2 class="card-title">Ritual slate</h2>
+          <div id="ritualBody" class="ritual-body"></div>
+        </section>
+      </div>
+
+      <!-- NOTEBOOK -->
+      <div id="view-notebook" class="view" style="display:none">
+        <section class="card"><h2 class="card-title">Notebook</h2><div id="notebookBody"></div></section>
+      </div>
+
+      <!-- COMBAT -->
+      <div id="view-combat" class="view" style="display:none">
+        <section class="card"><h2 class="card-title">Combat</h2><div id="combatBody"></div></section>
+      </div>
+
+      <!-- RESEARCH -->
+      <div id="view-research" class="view" style="display:none">
+        <section class="card"><h2 class="card-title">Research</h2><div id="researchBody"></div></section>
+      </div>
 
       <div class="footer">a small idle game · grow · sell · invoke</div>
     </main>

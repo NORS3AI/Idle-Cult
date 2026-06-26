@@ -58,7 +58,9 @@ body { display: flex; justify-content: center; min-height: 100vh; }
   background: var(--card-2); border: 1px solid var(--line);
   color: var(--text); font-size: 20px; line-height: 1; cursor: pointer;
 }
+.money-wrap { display: flex; flex-direction: column; line-height: 1.05; }
 .money { font-size: 26px; font-weight: 700; letter-spacing: .5px; }
+.rate { display: none; font-size: 12px; color: var(--good); font-weight: 600; margin-top: 2px; }
 .top-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .mult-chip { font-size: 18px; font-weight: 600; color: var(--text); }
 .haste-badge {
@@ -82,6 +84,44 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 }
 .menu button:hover { background: var(--row); }
 .menu-note { color: var(--muted); font-size: 12px; padding: 6px 10px 2px; }
+
+/* ---------- tab bar ---------- */
+.tabbar {
+  display: flex; gap: 8px; padding: 0 16px 12px;
+  position: sticky; top: 56px; z-index: 25;
+  background: linear-gradient(var(--bg) 80%, transparent);
+}
+.tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: var(--card-2); border: 1px solid var(--line); border-radius: 14px;
+  color: var(--muted); padding: 8px 4px; cursor: pointer; transition: all .15s;
+}
+.tab.active { color: var(--text); border-color: var(--accent); background: #221f18; }
+.tab-icon { font-size: 20px; line-height: 1; }
+.tab-label { font-size: 11px; font-weight: 600; }
+
+/* info button */
+.info-btn {
+  background: none; border: none; color: var(--muted);
+  font-size: 14px; cursor: pointer; padding: 0 2px; vertical-align: middle;
+}
+
+/* tab content helpers */
+.tab-intro { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
+.tab-placeholder { text-align: center; padding: 26px 10px; color: var(--text); }
+.tab-placeholder p { font-size: 15px; margin: 8px 0; }
+.tp-icon { font-size: 42px; margin-bottom: 8px; color: var(--accent); }
+
+/* notebook spells */
+.nb-spell { border-top: 1px solid var(--line); padding: 14px 0; }
+.nb-spell:first-of-type { border-top: none; }
+.nb-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.nb-notes {
+  width: 100%; min-height: 56px; resize: vertical;
+  background: #100f0d; border: 1px solid var(--line); border-radius: 10px;
+  color: var(--text); font-size: 14px; padding: 10px; font-family: inherit;
+}
+.nb-notes:focus { outline: none; border-color: var(--accent); }
 
 /* ---------- cards ---------- */
 .content { padding: 4px 16px 0; }
