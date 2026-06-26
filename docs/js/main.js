@@ -42,11 +42,11 @@
     clock();
     setInterval(clock, 10000);
 
-    // game tick (logic) — 5x/sec is plenty for an idle game
-    setInterval(() => { Game.tick(Game.now()); }, 200);
-    // render loop — smooth bars
-    function frame() { UI.render(); requestAnimationFrame(frame); }
+    // simulate + render each frame (smooth, game-speed aware)
+    function frame() { Game.tick(Game.now()); UI.render(); requestAnimationFrame(frame); }
     requestAnimationFrame(frame);
+    // backup tick so logic still advances if the tab throttles rAF
+    setInterval(() => { Game.tick(Game.now()); }, 1000);
 
     // autosave
     setInterval(Game.save, 5000);

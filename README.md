@@ -13,9 +13,13 @@ Progress auto-saves to your device and continues while you're away.
 ## How to play
 
 - **Seeds** — tap **Plant** to sow a seed into an empty planter (radish: `2¢`,
-  grows in `6s`, sells for `24¢`).
-- **Planters** — when a crop is ripe, tap **Sell** to collect. The **⟳** repeat
-  button on an empty planter auto-replants the same crop so it farms itself.
+  grows in `6s`, sells for `24¢`). Planting is always manual.
+- **Planters** — when a crop is ripe, tap **Sell** to collect. The **⟳** button
+  *saves the spot*: it keeps the planter assigned to that crop so you can replant
+  it with one tap. (It does **not** auto-plant; the **auto-harvester** upgrade is
+  what auto-sells ripe crops.)
+- **Game speed** — the chip in the top bar (`×1`) cycles **×1…×5** to run the
+  whole grove faster.
 - **Buy** — spend earnings on upgrades (the shop scrolls; collapse it with the ⌃ bar):
   - **planter** — adds another planter slot.
   - **candle** — set one on a corner of the Ritual slate (four complete the circle).
@@ -41,18 +45,13 @@ in the background or the device is asleep (offline progress is credited on retur
 
 ## The Ritual slate
 
-Once you own the **map** and place all **four candles** in the corners, tap a
-candle to light it and choose one of four **runes**. The four chosen runes form a
-pattern that spells a **rite**:
+Once you own the **map** and place all **four candles** in the corners, light
+each candle and set it to one of four **runes**. A rite is performed when all four
+candles show **one of each rune**; casting costs **mana**.
 
-| Rite | Pattern | Effect |
-|------|---------|--------|
-| Rite of Plenty | `ᚠ ᚠ ᚠ ᚠ` | Conjure a windfall of coin |
-| Rite of Bloom | `ᛇ ᛇ ᛇ ᛇ` | Instantly ripen every planter |
-| Rite of Haste | `ᛋ ᛋ ᛋ ᛋ` | Double growth speed for 90s |
-| Rite of Devotion | `ᚠ ᛇ ᛋ ᛟ` | Sacrifice all coin for a permanent `×` multiplier |
-
-Buy the **notebook** to reveal these patterns in the in-game spellbook.
+What a rite *does* is intentionally a mystery — cast it, watch what happens, and
+record your findings in the **Notebook** tab. Setting the fourth candle grants
+**100 free mana**; mana recharges slowly (`5`/hour, raised later via Research).
 
 ## Project layout
 

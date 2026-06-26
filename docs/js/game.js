@@ -46,14 +46,29 @@ const Game = (() => {
     if (!has('ledger')) return 0;
     return CONFIG.ledgerRate * avgPlantedSell(includeLast) * multiplier();
   }
-  function autoOn(p) { return p.repeat || has('auto-harvester'); }
-  function hasteActive() { return now() < (state.hasteUntil || 0); }
-  function growthSpeed() {
-    return 1 + (hasteActive() ? CONFIG.quickenSpeedBonus : 0);
+  function autoHarvest() { return has('auto-harvester'); }
+
+  /* ---------- rituals (one of each rune) ---------- */
+  function ritualReady() {
+    if (candleCount() < CONFIG.candleCount) return false;
+    const lit = state.candles.filter(c => c.lit);
+    if (lit.length < CONFIG.candleCount) return false;
+    return new Set(lit.map(c => c.rune)).size === CONFIG.candleCount; // one of each
   }
-  function manaMax() { return CONFIG.manaBase + CONFIG.manaPerCandle * candleCount(); }
-  function manaRegen() { return CONFIG.manaRegenBase + CONFIG.manaRegenPerCandle * candleCount(); }
+  function activeRite() {
+    // future: pick by exact rune arrangement. For now, the one known rite.
+    return SPELLS[0];
+  }
+  function canCastRitual() {
+    return ritualReady() && state.mana >= ritualManaCost();
+  }
+  function growthSpeed() { return 1; }                 // base; Research may raise this later
   function effGrow(seed) { return seed.grow / growthSpeed(); }
+  function speed() { return state.gameSpeed || 1; }    // game-speed multiplier ×1…×5
+  function cycleSpeed() { state.gameSpeed = (speed() % CONFIG.maxSpeed) + 1; return state.gameSpeed; }
+  function manaMax() { return CONFIG.manaMax; }
+  function manaRegenPerSec() { return CONFIG.manaRegenPerHour / 3600; }
+  function ritualManaCost() { return SPELLS[0].mana; }
   function slotCount() { return CONFIG.baseSlots + (state.items.planter || 0); }
 
   function itemPrice(item) {
@@ -79,32 +94,15 @@ const Game = (() => {
   }
   function ritualUnlocked() { return state.items[CONFIG.ritualUnlockItem] > 0; }
   function candleCount() { return state.items.candle || 0; }
-  function devotionCost() {
-    return Math.ceil(CONFIG.devotionBaseCost * Math.pow(CONFIG.devotionCostMul, state.ritualLevel));
-  }
-  function spellPattern() {                       // current lit runes, null where unlit/empty
-    return state.candles.map(c => (c.lit ? c.rune : null));
-  }
-  function matchedSpell() {
-    if (candleCount() < CONFIG.candleCount) return null;
-    const cur = spellPattern();
-    if (cur.some(r => r == null)) return null;
-    return SPELLS.find(sp => sp.pattern.every((r, i) => r === cur[i])) || null;
-  }
-  function canCast(sp) {
-    if (!sp) return false;
-    if (state.mana < sp.mana) return false;
-    if (sp.type === 'prestige' && state.cents < devotionCost()) return false;
-    return true;
-  }
 
   /* ---------- state setup ---------- */
-  function makePlanter() { return { seed: null, start: null, repeat: false, lastSeed: null }; }
+  function makePlanter() { return { seed: null, prog: 0, repeat: false, lastSeed: null }; }
   function makeCandle() { return { lit: false, rune: RUNES[0].id }; }
   function freshState() {
     return {
       cents: CONFIG.startCents,
       totalEarned: CONFIG.startCents,
+      gameSpeed: 1,
       ritualLevel: 0,
       ritualsPerformed: 0,
       unlockedSeeds: ['radish'],
@@ -112,7 +110,7 @@ const Game = (() => {
       planters: [makePlanter()],
       candles: [makeCandle(), makeCandle(), makeCandle(), makeCandle()],
       mana: 0,
-      hasteUntil: 0,
+      discovered: [],
       notes: {},
       lastTick: now(),
     };
@@ -138,31 +136,37 @@ const Game = (() => {
     if (planterIndex != null) { p = state.planters[planterIndex]; if (!p || p.seed) return false; }
     else { p = state.planters.find(pl => !pl.seed); if (!p) return false; }
     state.cents -= seed.cost;
-    p.seed = seedId; p.lastSeed = seedId; p.start = now();
+    p.seed = seedId; p.lastSeed = seedId; p.prog = 0;
     return true;
   }
-  function isGrown(p, t) {
+  function isGrown(p) {
     if (!p.seed) return false;
-    return (t - p.start) / 1000 >= effGrow(SEEDS_BY_ID[p.seed]);
+    return p.prog >= effGrow(SEEDS_BY_ID[p.seed]);
   }
-  function progress(p, t) {
+  function progress(p) {
     if (!p.seed) return 0;
-    return Math.min(1, ((t - p.start) / 1000) / effGrow(SEEDS_BY_ID[p.seed]));
+    return Math.min(1, p.prog / effGrow(SEEDS_BY_ID[p.seed]));
   }
-  function timeLeft(p, t) {
+  function timeLeft(p) {                                // real seconds left at current speed
     if (!p.seed) return 0;
-    return Math.max(0, effGrow(SEEDS_BY_ID[p.seed]) - (t - p.start) / 1000);
+    return Math.max(0, (effGrow(SEEDS_BY_ID[p.seed]) - p.prog) / speed());
   }
   function sell(planterIndex) {
     const p = state.planters[planterIndex];
-    if (!p || !p.seed || !isGrown(p, now())) return false;
+    if (!p || !p.seed || !isGrown(p)) return false;
     earn(SEEDS_BY_ID[p.seed].sell * multiplier());
-    p.seed = null; p.start = null;
+    p.seed = null; p.prog = 0;          // keep lastSeed so the spot can be replanted
     return true;
+  }
+  // "save the spot": quick MANUAL replant of the seed this planter last held
+  function replantSpot(planterIndex) {
+    const p = state.planters[planterIndex];
+    if (!p || p.seed || !p.lastSeed) return false;
+    return plant(p.lastSeed, planterIndex);
   }
   function toggleRepeat(planterIndex) {
     const p = state.planters[planterIndex];
-    if (p) p.repeat = !p.repeat;
+    if (p) p.repeat = !p.repeat;       // whether the slot keeps its plant for quick replant
   }
 
   /* ---------- shop ---------- */
@@ -174,6 +178,10 @@ const Game = (() => {
     state.cents -= price;
     state.items[itemId] = (state.items[itemId] || 0) + 1;
     if (item.id === 'planter') syncSlots();
+    // setting the fourth candle gifts a pool of free mana
+    if (item.id === 'candle' && state.items.candle === CONFIG.candleCount) {
+      state.mana = Math.min(manaMax(), state.mana + CONFIG.candleFreeMana);
+    }
     return true;
   }
 
@@ -197,61 +205,41 @@ const Game = (() => {
     c.lit = true;
   }
 
-  function castSpell() {
-    const sp = matchedSpell();
-    if (!sp) return null;
-    if (state.mana < sp.mana) return { id: sp.id, name: sp.name, blocked: true, reason: 'mana', need: sp.mana };
-    if (sp.type === 'prestige' && state.cents < devotionCost())
-      return { id: sp.id, name: sp.name, blocked: true, reason: 'gold', need: devotionCost() };
+  function castRitual() {
+    if (!ritualReady()) return null;
+    const rite = activeRite();
+    if (state.mana < rite.mana) return { blocked: true, reason: 'mana', need: rite.mana };
+    state.mana -= rite.mana;
 
-    state.mana -= sp.mana;
-    let result = { id: sp.id, name: sp.name };
-
-    if (sp.id === 'quicken') {
-      state.hasteUntil = now() + sp.duration * 1000;
-    } else if (sp.id === 'bloom') {
-      const t = now();
-      state.planters.forEach(p => { if (p.seed) p.start = t - effGrow(SEEDS_BY_ID[p.seed]) * 1000 - 50; });
-    } else if (sp.id === 'plenty') {
-      const best = state.unlockedSeeds.map(id => SEEDS_BY_ID[id]).sort((a, b) => b.sell - a.sell)[0];
-      const gain = best.sell * multiplier() * 10;
-      earn(gain);
-      result.gain = gain;
-    } else if (sp.id === 'devotion') {
-      state.ritualLevel += 1;
-      state.ritualsPerformed += 1;
-      state.cents = CONFIG.startCents;
-      state.items.planter = 0;
-      state.items.candle = 0;
-      state.planters = [makePlanter()];
-      state.candles = [makeCandle(), makeCandle(), makeCandle(), makeCandle()];
-      state.mana = 0;
-      result.prestige = true;
+    if (rite.effect === 'halveRemaining') {
+      state.planters.forEach(p => {
+        if (p.seed && !isGrown(p)) {
+          const g = effGrow(SEEDS_BY_ID[p.seed]);
+          p.prog += (g - p.prog) * CONFIG.ritualHalve;   // advance halfway to ripe
+        }
+      });
     }
-    // snuff candles after a successful cast
-    state.candles.forEach(c => { c.lit = false; });
-    return result;
+    // remember that this rite was performed (for the Notebook), effect still hidden
+    if (!state.discovered.includes(rite.id)) state.discovered.push(rite.id);
+    return { cast: true, id: rite.id };
   }
 
   /* ---------- live simulation tick ---------- */
   function tick(t) {
-    const dt = Math.max(0, (t - state.lastTick) / 1000);
-    state.mana = Math.min(manaMax(), state.mana + manaRegen() * dt);
-    if (dt > 0) { const inc = ledgerPerSec(false) * dt; if (inc > 0) earn(inc); }
+    const dt = (t - state.lastTick) / 1000;
+    if (dt <= 0) { state.lastTick = t; return; }
+    if (dt > 10) { applyOffline(); return; } // a real gap (sleep/close) → real-time offline path
+    state.lastTick = t;
+    const sdt = dt * speed();             // sped-up game seconds this frame
+    state.mana = Math.min(manaMax(), state.mana + manaRegenPerSec() * sdt);
+    const inc = ledgerPerSec(false) * sdt; if (inc > 0) earn(inc);
     for (const p of state.planters) {
-      if (p.seed) {
-        if (isGrown(p, t) && autoOn(p)) {
-          earn(SEEDS_BY_ID[p.seed].sell * multiplier());
-          const seed = SEEDS_BY_ID[p.lastSeed];
-          if (p.lastSeed && state.cents >= seed.cost) { state.cents -= seed.cost; p.seed = p.lastSeed; p.start = t; }
-          else { p.seed = null; p.start = null; }
-        }
-      } else if (autoOn(p) && p.lastSeed) {
-        const seed = SEEDS_BY_ID[p.lastSeed];
-        if (state.cents >= seed.cost) { state.cents -= seed.cost; p.seed = p.lastSeed; p.start = t; }
+      if (!p.seed) continue;
+      if (!isGrown(p)) p.prog += sdt;
+      if (isGrown(p) && autoHarvest()) {   // auto-harvester only auto-SELLS (planting is manual)
+        earn(SEEDS_BY_ID[p.seed].sell * multiplier()); p.seed = null; p.prog = 0;
       }
     }
-    state.lastTick = t;
   }
 
   /* ---------- offline progress (closed-form) ---------- */
@@ -261,34 +249,23 @@ const Game = (() => {
     if (dt <= 1) { state.lastTick = t; return null; }
     dt = Math.min(dt, CONFIG.offlineCapSeconds);
     const mult = multiplier();
-    // offline assumes no haste (buff would have expired) → base grow time
     let gained = 0;
     // ledger passive income (based on what is/was planted)
     gained += ledgerPerSec(true) * dt;
+    // planters: nothing is auto-planted while away. A crop matures and waits;
+    // the auto-harvester sells it once when ripe.
+    // offline advances at real time (game-speed only applies to active play)
     for (const p of state.planters) {
-      if (p.seed) {
-        const seed = SEEDS_BY_ID[p.seed];
-        const g = seed.grow;
-        const already = (state.lastTick - p.start) / 1000;
-        const left = Math.max(0, g - already);
-        if (dt < left) continue;
-        if (!autoOn(p)) { p.start = t - g * 1000; continue; }
-        const cycles = 1 + Math.floor((dt - left) / g);
-        gained += cycles * (seed.sell * mult - seed.cost);
-        p.start = t - ((dt - left) % g) * 1000;
-      } else if (autoOn(p) && p.lastSeed) {
-        const seed = SEEDS_BY_ID[p.lastSeed];
-        const g = seed.grow;
-        const cycles = Math.floor(dt / g);
-        if (cycles > 0) {
-          gained += cycles * (seed.sell * mult - seed.cost);
-          p.seed = p.lastSeed; p.start = t - (dt % g) * 1000;
-        }
-      }
+      if (!p.seed) continue;
+      const seed = SEEDS_BY_ID[p.seed];
+      const g = effGrow(seed);
+      p.prog += dt;
+      if (p.prog < g) continue;                    // still growing
+      if (autoHarvest()) { gained += seed.sell * mult; p.seed = null; p.prog = 0; }
+      else { p.prog = g; }                          // ripe, waiting for a manual sell
     }
     if (gained > 0) earn(gained);
-    state.mana = Math.min(manaMax(), state.mana + manaRegen() * dt);
-    state.hasteUntil = 0;
+    state.mana = Math.min(manaMax(), state.mana + manaRegenPerSec() * dt);
     state.lastTick = t;
     return gained > 0 ? { seconds: dt, gained } : null;
   }
@@ -304,9 +281,16 @@ const Game = (() => {
         state = Object.assign(freshState(), JSON.parse(raw));
         state.items = Object.assign({ planter: 0, candle: 0, map: 0, notebook: 0 }, state.items || {});
         if (typeof state.mana !== 'number') state.mana = 0;
+        if (!Array.isArray(state.discovered)) state.discovered = [];
         if (!state.notes || typeof state.notes !== 'object') state.notes = {};
+        if (!(state.gameSpeed >= 1 && state.gameSpeed <= CONFIG.maxSpeed)) state.gameSpeed = 1;
         if (!Array.isArray(state.planters) || !state.planters.length) state.planters = [makePlanter()];
-        state.planters = state.planters.map(p => Object.assign(makePlanter(), p));
+        state.planters = state.planters.map(p => {
+          const np = Object.assign(makePlanter(), p);
+          if (typeof np.prog !== 'number') np.prog = 0;   // migrate old timestamp saves
+          delete np.start;
+          return np;
+        });
         if (!Array.isArray(state.candles) || state.candles.length !== 4)
           state.candles = [makeCandle(), makeCandle(), makeCandle(), makeCandle()];
         state.candles = state.candles.map(c => Object.assign(makeCandle(), c));
@@ -325,13 +309,13 @@ const Game = (() => {
   return {
     get state() { return state; },
     fmtMoney, fmtTime, now,
-    multiplier, growthSpeed, hasteActive, effGrow, slotCount,
-    manaMax, manaRegen, has, tabUnlocked, avgPlantedSell, ledgerPerSec, autoOn,
+    multiplier, growthSpeed, effGrow, slotCount, speed, cycleSpeed,
+    manaMax, manaRegenPerSec, ritualManaCost, has, tabUnlocked, avgPlantedSell, ledgerPerSec, autoHarvest,
     itemPrice, itemStockLeft, itemSoldOut, nextLockedSeed,
-    ritualUnlocked, candleCount, devotionCost,
-    spellPattern, matchedSpell, canCast,
-    plant, sell, toggleRepeat, buyItem,
-    toggleCandle, setRune, cycleRune, castSpell, setNote,
+    ritualUnlocked, candleCount,
+    ritualReady, canCastRitual, activeRite, castRitual,
+    plant, sell, replantSpot, toggleRepeat, buyItem,
+    toggleCandle, setRune, cycleRune, setNote,
     isGrown, progress, timeLeft,
     tick, applyOffline, save, load, reset,
     SEEDS, ITEMS, TABS, RUNES, SPELLS, SEEDS_BY_ID, ITEMS_BY_ID, RUNES_BY_ID, SPELLS_BY_ID, CONFIG,

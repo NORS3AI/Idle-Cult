@@ -4,15 +4,15 @@
    ============================================================ */
 
 const SEEDS = [
-  // unlockAt = lifetime cents earned required to reveal this seed
-  { id: 'radish',     name: 'radish',     icon: '🌡️', cost: 2,        grow: 6,   sell: 24,        unlockAt: 0 },
-  { id: 'carrot',     name: 'carrot',     icon: '🥕', cost: 20,       grow: 12,  sell: 140,       unlockAt: 250 },
-  { id: 'corn',       name: 'corn',       icon: '🌽', cost: 160,      grow: 20,  sell: 1100,      unlockAt: 2000 },
-  { id: 'pumpkin',    name: 'pumpkin',    icon: '🎃', cost: 1300,     grow: 32,  sell: 9000,      unlockAt: 18000 },
-  { id: 'nightshade', name: 'nightshade', icon: '🍆', cost: 11000,    grow: 50,  sell: 78000,     unlockAt: 150000 },
-  { id: 'bloodvine',  name: 'bloodvine',  icon: '🍇', cost: 95000,    grow: 80,  sell: 720000,    unlockAt: 1300000 },
-  { id: 'moonflower', name: 'moonflower', icon: '🌼', cost: 850000,   grow: 130, sell: 7200000,   unlockAt: 12000000 },
-  { id: 'wraithlily', name: 'wraithlily', icon: '🪷', cost: 8000000,  grow: 200, sell: 80000000,  unlockAt: 130000000 },
+  // grow = seconds, sell/cost = cents, unlockAt = lifetime cents earned to reveal
+  { id: 'radish',   name: 'radish',   icon: '🥬', cost: 2,       grow: 6,     sell: 24,       unlockAt: 0 },
+  { id: 'carrot',   name: 'carrot',   icon: '🥕', cost: 17,      grow: 30,    sell: 170,      unlockAt: 270 },       // $2.70
+  { id: 'cabbage',  name: 'cabbage',  icon: '🥦', cost: 86,      grow: 240,   sell: 856,      unlockAt: 1890 },      // $18.90 (4 min)
+  { id: 'pumpkin',  name: 'pumpkin',  icon: '🎃', cost: 886,     grow: 2160,  sell: 8862,     unlockAt: 3323 },      // $33.23 (36 min)
+  { id: 'eggplant', name: 'eggplant', icon: '🍆', cost: 2762,    grow: 5400,  sell: 27623,    unlockAt: 12000 },     // (90 min)
+  { id: 'corn',     name: 'corn',     icon: '🌽', cost: 8787,    grow: 18840, sell: 87867,    unlockAt: 80000 },     // (314 min)
+  { id: 'cucumber', name: 'cucumber', icon: '🥒', cost: 278316,  grow: 42720, sell: 2783164,  unlockAt: 600000 },    // (712 min)
+  { id: 'melon',    name: 'melon',    icon: '🍈', cost: 4937219, grow: 62640, sell: 49372188, unlockAt: 5000000 },   // (1044 min)
 ];
 
 const SEEDS_BY_ID = Object.fromEntries(SEEDS.map(s => [s.id, s]));
@@ -81,34 +81,19 @@ const RUNES = [
 ];
 const RUNES_BY_ID = Object.fromEntries(RUNES.map(r => [r.id, r]));
 
-/* Spells: a pattern is the rune in each of the four corners
-   in order [top-left, top-right, bottom-left, bottom-right].
-   Requires all four candles placed & lit on the matching rune.
-   Casting costs MANA, which slowly regenerates (faster with candles). */
+/* Rites (spells).
+   A rite is performed by lighting all four candles with ONE OF EACH rune.
+   Casting costs mana. The EFFECT IS DELIBERATELY HIDDEN from the player —
+   they discover what a rite does by casting it and writing notes in the
+   Notebook. More rites are earned as the game goes on; for now there is
+   one: it halves the remaining grow time of every plant in a planter. */
 const SPELLS = [
   {
-    id: 'quicken', name: 'Rite of Quickening',
-    pattern: ['sowilo', 'sowilo', 'sowilo', 'sowilo'],
-    type: 'buff', mana: 10, duration: 60,
-    desc: 'Halve every planter\'s grow time for 60s.',
-  },
-  {
-    id: 'bloom', name: 'Rite of Bloom',
-    pattern: ['eihwaz', 'eihwaz', 'eihwaz', 'eihwaz'],
-    type: 'instant', mana: 20,
-    desc: 'Instantly ripen every planter.',
-  },
-  {
-    id: 'plenty', name: 'Rite of Plenty',
-    pattern: ['fehu', 'fehu', 'fehu', 'fehu'],
-    type: 'instant', mana: 30,
-    desc: 'Conjure a windfall of coin.',
-  },
-  {
-    id: 'devotion', name: 'Rite of Devotion',
-    pattern: ['fehu', 'eihwaz', 'sowilo', 'othala'],
-    type: 'prestige', mana: 50,
-    desc: 'Sacrifice all worldly coin for permanent +1 devotion (×).',
+    id: 'rite_halftime',
+    runes: ['fehu', 'eihwaz', 'sowilo', 'othala'], // "one of each"
+    mana: 10,
+    effect: 'halveRemaining',
+    // no name / desc shown in-game — the player figures it out
   },
 ];
 const SPELLS_BY_ID = Object.fromEntries(SPELLS.map(s => [s.id, s]));
@@ -126,15 +111,14 @@ const CONFIG = {
   ledgerRate: 0.04,              // 4% of average planted crop value per second
 
   baseSlots: 1,
-  offlineCapSeconds: 8 * 3600,   // cap offline progress at 8 hours
+  offlineCapSeconds: 24 * 3600,  // cap offline progress at 24 hours
   ritualUnlockItem: 'map',       // ritual slate unlocked by buying the map
   candleCount: 4,
-  devotionBaseCost: 50000,       // $500 to perform first Rite of Devotion
-  devotionCostMul: 12,           // each devotion costs 12x more
-  quickenSpeedBonus: 1.0,        // +100% growth speed (halves time) while Quickening is active
-  manaBase: 20,                  // max mana with the slate unlocked, no candles
-  manaPerCandle: 10,             // each candle raises the mana ceiling
-  manaRegenBase: 0.6,            // mana per second
-  manaRegenPerCandle: 0.35,      // extra mana/sec per candle
+  ritualHalve: 0.5,              // a rite halves the remaining grow time
+  manaMax: 100,                  // mana ceiling (raised later via Research)
+  manaRegenPerHour: 5,           // mana recharge rate
+  candleFreeMana: 100,           // free mana granted when the 4th candle is set
+  buyPageSize: 4,                // shop shows four upgrades at a time
+  maxSpeed: 5,                   // game-speed selector cycles ×1 … ×5
   saveKey: 'idle-cult-save-v1',
 };
