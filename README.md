@@ -1,0 +1,2 @@
+# Idle-Cult
+Idle game
