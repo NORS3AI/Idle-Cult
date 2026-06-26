@@ -28,8 +28,7 @@
         <div id="rate" class="rate"></div>
       </div>
       <div class="top-right">
-        <span id="hasteBadge" class="haste-badge"></span>
-        <span class="mult-chip">×<span id="mult">1</span></span>
+        <button id="speedBtn" class="mult-chip" title="Game speed — tap to change">×<span id="mult">1</span></button>
         <button id="menuBtn" class="menu-btn" aria-label="menu">⋯</button>
       </div>
       <div id="menu" class="menu">
@@ -46,8 +45,9 @@
       <div id="view-home" class="view">
         <section class="card">
           <h2 class="card-title">Buy</h2>
-          <button id="buyToggle" class="collapse-bar top"><span id="buyChevron" class="chevron">⌃</span></button>
+          <button id="buyUp" class="collapse-bar" aria-label="previous upgrades">⌃</button>
           <div id="buyList" class="list"></div>
+          <button id="buyDown" class="collapse-bar" aria-label="next upgrades">⌄</button>
         </section>
 
         <section class="card">

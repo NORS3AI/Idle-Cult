@@ -1,11 +1,11 @@
 /* ============================================================
    Idle Cult — UI rendering
-   Tabs (Grove / Notebook / Combat / Research), rebuilds on
-   structural change, updates smooth values per frame.
+   Tabs (Grove / Notebook / Combat / Research). Paginated shop,
+   manual planting with "saved spots", hidden-effect rites.
    ============================================================ */
 
 const UI = (() => {
-  let buyCollapsed = false;
+  let buyPage = 0;
   let selectedCandle = null;
   let activeTab = 'home';
   let lastSig = '';
@@ -14,28 +14,31 @@ const UI = (() => {
   const G = () => Game.state;
 
   function init() {
-    el('buyToggle').addEventListener('click', () => { buyCollapsed = !buyCollapsed; forceRebuild(); render(); });
+    el('buyUp').addEventListener('click', () => { buyPage = Math.max(0, buyPage - 1); forceRebuild(); render(); });
+    el('buyDown').addEventListener('click', () => { buyPage = Math.min(maxBuyPage(), buyPage + 1); forceRebuild(); render(); });
+    el('speedBtn').addEventListener('click', () => { Game.cycleSpeed(); Game.save(); forceRebuild(); render(); });
     el('menuBtn').addEventListener('click', e => { e.stopPropagation(); el('menu').classList.toggle('open'); });
     document.addEventListener('click', e => {
       if (!el('menu').contains(e.target) && e.target !== el('menuBtn')) el('menu').classList.remove('open');
     });
     el('menuReset').addEventListener('click', () => {
       if (confirm('Abandon the cult and start over? All progress will be lost.')) {
-        Game.reset(); activeTab = 'home'; forceRebuild(); render();
+        Game.reset(); activeTab = 'home'; buyPage = 0; forceRebuild(); render();
       }
       el('menu').classList.remove('open');
     });
     el('tabbar').addEventListener('click', e => {
       const b = e.target.closest('[data-tab]');
-      if (!b) return;
-      const id = b.dataset.tab;
-      if (!Game.tabUnlocked(id)) return;
-      activeTab = id; selectedCandle = null; Game.save(); forceRebuild(); render();
+      if (!b || !Game.tabUnlocked(b.dataset.tab)) return;
+      activeTab = b.dataset.tab; selectedCandle = null; Game.save(); forceRebuild(); render();
       window.scrollTo({ top: 0 });
     });
   }
   function forceRebuild() { lastSig = ''; }
   function act(changed) { if (changed) { Game.save(); forceRebuild(); render(); } }
+
+  function shopItems() { return Game.ITEMS.filter(i => !Game.itemSoldOut(i)); }
+  function maxBuyPage() { return Math.max(0, Math.ceil(shopItems().length / Game.CONFIG.buyPageSize) - 1); }
 
   function bar(pct, cls) {
     return `<div class="bar ${cls || ''}"><div class="bar-fill" style="width:${Math.max(0, Math.min(100, pct * 100))}%"></div></div>`;
@@ -45,21 +48,23 @@ const UI = (() => {
   function structuralSig() {
     const s = G();
     return [
-      activeTab, buyCollapsed, selectedCandle,
+      activeTab, buyPage, selectedCandle,
       s.planters.length,
       s.unlockedSeeds.join(','),
       JSON.stringify(s.items),
       Game.ritualUnlocked(),
       s.candles.map(c => (c.lit ? 'L' : 'd') + c.rune[0]).join(''),
-      (Game.matchedSpell() || {}).id || '',
-      s.planters.map(p => (p.seed || '_') + (p.repeat ? 'R' : '')).join('|'),
+      Game.ritualReady(),
+      (s.discovered || []).join(','),
+      s.planters.map(p => (p.seed || ('_' + (p.lastSeed || ''))) + (p.repeat ? 'R' : '')).join('|'),
     ].join(';');
   }
 
   /* ---------- top bar + tabs ---------- */
   function renderTop() {
     el('money').textContent = Game.fmtMoney(G().cents);
-    el('mult').textContent = '×' + Game.multiplier();
+    el('mult').textContent = Game.speed();
+    el('speedBtn').classList.toggle('fast', Game.speed() > 1);
   }
   function renderTabs() {
     if (!Game.tabUnlocked(activeTab)) activeTab = 'home';
@@ -73,26 +78,29 @@ const UI = (() => {
       el('view-' + v).style.display = (v === activeTab ? 'block' : 'none'));
   }
 
-  /* ---------- BUY ---------- */
+  /* ---------- BUY (paginated, four at a time) ---------- */
   function renderBuy() {
+    const items = shopItems();
+    const max = maxBuyPage();
+    if (buyPage > max) buyPage = max;
+    const size = Game.CONFIG.buyPageSize;
+    const page = items.slice(buyPage * size, buyPage * size + size);
+
+    el('buyUp').classList.toggle('disabled', buyPage <= 0);
+    el('buyDown').classList.toggle('disabled', buyPage >= max);
+
     const wrap = el('buyList');
-    wrap.style.display = buyCollapsed ? 'none' : 'block';
-    el('buyChevron').classList.toggle('flipped', buyCollapsed);
-    if (buyCollapsed) { wrap.innerHTML = ''; return; }
-    let html = '';
-    for (const item of Game.ITEMS) {
-      if (Game.itemSoldOut(item)) continue;
+    wrap.innerHTML = page.map(item => {
       const price = Game.itemPrice(item);
       const stockLabel = item.kind !== 'once' ? ` <span class="muted">(${Game.itemStockLeft(item)} left)</span>` : '';
       const info = item.info ? ` <button class="info-btn" data-info="${item.id}" aria-label="info">ⓘ</button>` : '';
-      html += `
-        <div class="row">
+      return `<div class="row">
           <div class="row-main"><div class="row-title">${item.name}${info}${stockLabel}</div></div>
           <div class="row-price">${Game.fmtMoney(price)}</div>
           <button class="btn" data-buy="${item.id}" data-cost="${price}">Buy</button>
         </div>`;
-    }
-    wrap.innerHTML = html || '<div class="empty-note">Nothing left to buy here.</div>';
+    }).join('') || '<div class="empty-note">Nothing left to buy.</div>';
+
     wrap.querySelectorAll('[data-buy]').forEach(b => b.addEventListener('click', () => act(Game.buyItem(b.dataset.buy))));
     wrap.querySelectorAll('[data-info]').forEach(b => b.addEventListener('click', e => {
       e.stopPropagation(); const it = Game.ITEMS_BY_ID[b.dataset.info]; toast(`<b>${it.name}</b> — ${it.desc}`);
@@ -105,8 +113,7 @@ const UI = (() => {
     let html = '';
     for (const seed of Game.SEEDS) {
       if (!G().unlockedSeeds.includes(seed.id)) continue;
-      html += `
-        <div class="row">
+      html += `<div class="row">
           <div class="icon-box">${seed.icon}</div>
           <div class="row-main">
             <div class="row-title">${seed.name}</div>
@@ -119,8 +126,7 @@ const UI = (() => {
     const locked = Game.nextLockedSeed();
     if (locked) {
       const pct = G().totalEarned / locked.unlockAt;
-      html += `
-        <div class="row">
+      html += `<div class="row">
           <div class="icon-box locked-icon">⬤</div>
           <div class="row-main"><div class="row-title muted">???</div>${bar(pct, 'thin')}</div>
           <button class="btn icon-btn disabled">🔒</button>
@@ -135,30 +141,36 @@ const UI = (() => {
     const wrap = el('planterList');
     let html = '';
     G().planters.forEach((p, i) => {
+      const rep = `<button class="btn icon-btn repeat ${p.repeat ? 'on' : ''}" data-repeat="${i}" title="Save this spot — keep replanting this crop">⟳</button>`;
       if (p.seed) {
         const seed = Game.SEEDS_BY_ID[p.seed];
-        const grown = Game.isGrown(p, Game.now());
-        html += `
-          <div class="row planter" data-i="${i}">
+        const grown = Game.isGrown(p);
+        html += `<div class="row planter" data-i="${i}">
             <div class="icon-box">${seed.icon}</div>
-            <div class="row-main">
-              <div class="row-title">${seed.name}</div>
-              ${bar(grown ? 1 : Game.progress(p, Game.now()), grown ? 'done' : '')}
-            </div>
-            <div class="row-price small time-${i}">${grown ? 'ready' : Game.fmtTime(Game.timeLeft(p, Game.now()))}</div>
+            <div class="row-main"><div class="row-title">${seed.name}</div>${bar(grown ? 1 : Game.progress(p), grown ? 'done' : '')}</div>
+            <div class="row-price small time-${i}">${grown ? 'ready' : Game.fmtTime(Game.timeLeft(p))}</div>
+            ${rep}
             <button class="btn ${grown ? '' : 'disabled'}" data-sell="${i}">Sell</button>
           </div>`;
+      } else if (p.repeat && p.lastSeed) {
+        const seed = Game.SEEDS_BY_ID[p.lastSeed];
+        html += `<div class="row planter empty saved" data-i="${i}">
+            <div class="icon-box faded">${seed.icon}</div>
+            <div class="row-main"><div class="row-title muted">${seed.name}</div>${bar(0, '')}</div>
+            ${rep}
+            <button class="btn primary" data-replant="${i}" data-cost="${seed.cost}">Plant</button>
+          </div>`;
       } else {
-        html += `
-          <div class="row planter empty" data-i="${i}">
+        html += `<div class="row planter empty" data-i="${i}">
             <div class="icon-box ghost"></div>
             <div class="row-main">${bar(0, '')}</div>
-            <button class="btn icon-btn repeat ${p.repeat ? 'on' : ''}" data-repeat="${i}" title="Auto-replant">⟳</button>
+            ${rep}
           </div>`;
       }
     });
     wrap.innerHTML = html;
     wrap.querySelectorAll('[data-sell]').forEach(b => b.addEventListener('click', () => act(Game.sell(+b.dataset.sell))));
+    wrap.querySelectorAll('[data-replant]').forEach(b => b.addEventListener('click', () => act(Game.replantSpot(+b.dataset.replant))));
     wrap.querySelectorAll('[data-repeat]').forEach(b => b.addEventListener('click', () => { Game.toggleRepeat(+b.dataset.repeat); act(true); }));
   }
 
@@ -179,27 +191,24 @@ const UI = (() => {
     G().candles.forEach((c, i) => {
       if (i >= count) { cornersHtml += `<div class="corner ${corners[i]} holder"><span class="holder-dot">·</span></div>`; return; }
       const rune = Game.RUNES_BY_ID[c.rune];
-      cornersHtml += `
-        <div class="corner ${corners[i]} candle ${c.lit ? 'lit' : ''} ${selectedCandle === i ? 'sel' : ''}" data-candle="${i}">
+      cornersHtml += `<div class="corner ${corners[i]} candle ${c.lit ? 'lit' : ''} ${selectedCandle === i ? 'sel' : ''}" data-candle="${i}">
           <div class="flame"></div><div class="candle-body"></div>
           <div class="rune ${c.lit ? '' : 'dim'}">${rune.sym}</div>
         </div>`;
     });
 
-    const matched = Game.matchedSpell();
     let center;
     if (count < Game.CONFIG.candleCount) {
       const n = Game.CONFIG.candleCount - count;
       center = `<div class="slate-center hint">Set ${n} more candle${n > 1 ? 's' : ''} from the shop.</div>`;
-    } else if (matched) {
-      const ok = Game.canCast(matched);
-      const extra = matched.id === 'devotion' ? `<div class="cast-sub">needs ${Game.fmtMoney(Game.devotionCost())}</div>` : '';
+    } else if (Game.ritualReady()) {
+      const ok = Game.canCastRitual();
       center = `<div class="slate-center matched">
-          <div class="cast-name">${matched.name}</div>
-          <button class="btn primary cast-btn ${ok ? '' : 'disabled'}" id="castBtn">Cast · ${matched.mana}✦</button>${extra}
+          <div class="cast-name">a rite stirs…</div>
+          <button class="btn primary cast-btn ${ok ? '' : 'disabled'}" id="castBtn">Cast · ${Game.ritualManaCost()}✦</button>
         </div>`;
     } else {
-      center = `<div class="slate-center hint">Light the candles &amp; align the runes.</div>`;
+      center = `<div class="slate-center hint">Light all four candles — <b>one of each rune</b>.</div>`;
     }
 
     const mana = Math.floor(G().mana), mmax = Game.manaMax();
@@ -213,12 +222,13 @@ const UI = (() => {
     if (selectedCandle != null && selectedCandle < count) {
       const cur = G().candles[selectedCandle];
       picker = `<div class="rune-picker">
-        ${Game.RUNES.map(r => `<button class="rune-opt ${cur.rune === r.id && cur.lit ? 'active' : ''}" data-setrune="${r.id}" title="${r.name} · ${r.mean}">${r.sym}</button>`).join('')}
+        ${Game.RUNES.map(r => `<button class="rune-opt ${cur.rune === r.id && cur.lit ? 'active' : ''}" data-setrune="${r.id}" title="${r.name}">${r.sym}</button>`).join('')}
         <button class="rune-opt snuff" data-snuff="1" title="Snuff candle">✕</button>
       </div>`;
     }
 
-    body.innerHTML = `${manaBar}<div class="slate">${cornersHtml}${center}</div>${picker}${renderSpellbook(false)}`;
+    const note = `<div class="rite-hint">What a rite does is for you to discover — record it in your <b>Notebook</b>.</div>`;
+    body.innerHTML = `${manaBar}<div class="slate">${cornersHtml}${center}</div>${picker}${note}`;
 
     body.querySelectorAll('[data-candle]').forEach(c => c.addEventListener('click', () => {
       const i = +c.dataset.candle; selectedCandle = (selectedCandle === i) ? null : i; forceRebuild(); render();
@@ -230,30 +240,11 @@ const UI = (() => {
     if (castBtn) castBtn.addEventListener('click', doCast);
   }
 
-  function renderSpellbook(reveal) {
-    reveal = reveal || Game.has('notebook');
-    const rows = SPELLS.map(sp => {
-      const pat = reveal
-        ? sp.pattern.map(rid => `<span class="mini-rune">${Game.RUNES_BY_ID[rid].sym}</span>`).join('')
-        : '<span class="mini-rune q">?</span>'.repeat(4);
-      return `<div class="spell-row">
-          <div class="spell-pat">${pat}</div>
-          <div class="spell-info"><div class="spell-name">${sp.name} <span class="spell-mana">${sp.mana}✦</span></div><div class="spell-desc">${sp.desc}</div></div>
-        </div>`;
-    }).join('');
-    const note = reveal ? '' : `<div class="spell-hint">Buy the <b>notebook</b> to reveal these patterns.</div>`;
-    return `<div class="spellbook"><div class="spellbook-title">Spellbook</div>${rows}${note}</div>`;
-  }
-
   function doCast() {
-    const res = Game.castSpell();
-    if (!res || res.blocked) { flashCenter(); return; }
-    if (res.prestige && typeof confetti === 'function') confetti();
-    if (res.gain) toast(`The Rite of Plenty conjures <b>${Game.fmtMoney(res.gain)}</b>.`);
-    if (res.id === 'bloom') toast('Every planter ripens at once.');
-    if (res.id === 'quicken') toast('The grove quickens — grow times <b>halved</b> for 60s.');
-    if (res.prestige) toast(`Devotion accepted. The cult grows stronger: <b>×${Game.multiplier()}</b>.`);
-    selectedCandle = null; act(true);
+    const res = Game.castRitual();
+    if (!res || res.blocked) { flashCenter(); if (res && res.reason === 'mana') toast('Not enough mana.'); return; }
+    toast('The runes flare, then the circle goes dark.');   // effect deliberately unspoken
+    act(true);
   }
   function flashCenter() {
     const c = document.querySelector('.slate-center');
@@ -263,38 +254,36 @@ const UI = (() => {
   /* ---------- NOTEBOOK tab ---------- */
   function renderNotebook() {
     const body = el('notebookBody');
-    let html = `<p class="tab-intro">The rites you know. Jot down what each one does for you.</p>`;
-    html += SPELLS.map(sp => {
-      const pat = sp.pattern.map(rid => `<span class="mini-rune">${Game.RUNES_BY_ID[rid].sym}</span>`).join('');
-      const note = (G().notes && G().notes[sp.id]) ? G().notes[sp.id] : '';
+    const disc = (G().discovered || []);
+    if (!disc.length) {
+      body.innerHTML = `<p class="tab-intro">Perform a rite at the Ritual slate and it will be recorded here — then jot down what you think it does.</p>`;
+      return;
+    }
+    let html = `<p class="tab-intro">Rites you have performed. Write your own notes on what each one does.</p>`;
+    html += disc.map(id => {
+      const sp = Game.SPELLS_BY_ID[id];
+      const pat = sp.runes.map(rid => `<span class="mini-rune">${Game.RUNES_BY_ID[rid].sym}</span>`).join('');
+      const note = (G().notes && G().notes[id]) ? G().notes[id] : '';
       return `<div class="nb-spell">
           <div class="nb-head"><div class="spell-pat">${pat}</div>
-            <div class="spell-info"><div class="spell-name">${sp.name} <span class="spell-mana">${sp.mana}✦</span></div><div class="spell-desc">${sp.desc}</div></div></div>
-          <textarea class="nb-notes" data-note="${sp.id}" placeholder="Your notes…">${escapeHtml(note)}</textarea>
+            <div class="spell-info"><div class="spell-name">Unnamed rite</div><div class="spell-desc muted">one of each rune · ${sp.mana}✦</div></div></div>
+          <textarea class="nb-notes" data-note="${id}" placeholder="What does it do?">${escapeHtml(note)}</textarea>
         </div>`;
     }).join('');
     body.innerHTML = html;
     body.querySelectorAll('[data-note]').forEach(t => t.addEventListener('input', () => { Game.setNote(t.dataset.note, t.value); Game.save(); }));
   }
 
-  /* ---------- COMBAT tab ---------- */
+  /* ---------- COMBAT / RESEARCH placeholders ---------- */
   function renderCombat() {
-    el('combatBody').innerHTML = `
-      <div class="tab-placeholder">
-        <div class="tp-icon">⚔</div>
-        <p>The map reveals roads out of the grove. Skirmishes, raids and rival covens await here.</p>
-        <p class="muted">Combat is being prepared — check back soon.</p>
-      </div>`;
+    el('combatBody').innerHTML = `<div class="tab-placeholder"><div class="tp-icon">⚔</div>
+        <p>The map reveals roads out of the grove — skirmishes and rival covens await.</p>
+        <p class="muted">Combat is being prepared — check back soon.</p></div>`;
   }
-
-  /* ---------- RESEARCH tab ---------- */
   function renderResearch() {
-    el('researchBody').innerHTML = `
-      <div class="tab-placeholder">
-        <div class="tp-icon">⚗</div>
-        <p>The alembic bubbles. Here you'll unlock alchemical upgrades that reshape the whole cult.</p>
-        <p class="muted">Research nodes are being prepared — check back soon.</p>
-      </div>`;
+    el('researchBody').innerHTML = `<div class="tab-placeholder"><div class="tp-icon">⚗</div>
+        <p>The alembic bubbles. Here you'll unlock alchemical upgrades — including deeper mana reserves.</p>
+        <p class="muted">Research nodes are being prepared — check back soon.</p></div>`;
   }
 
   /* ---------- master render ---------- */
@@ -315,18 +304,17 @@ const UI = (() => {
   /* smooth per-frame updates without rebuilding listeners */
   function updateLive() {
     const cents = G().cents;
-    // income rate (ledger)
     const rate = Game.ledgerPerSec(false);
     const re = el('rate');
     if (re) { if (rate >= 1) { re.style.display = 'block'; re.textContent = '+' + Game.fmtMoney(rate) + '/s'; } else re.style.display = 'none'; }
 
-    if (activeTab !== 'home') return; // only home has the live widgets below
+    if (activeTab !== 'home') return;
     G().planters.forEach((p, i) => {
       const fill = document.querySelector(`.row.planter[data-i="${i}"] .bar-fill`);
       if (p.seed && fill) {
-        const grown = Game.isGrown(p, Game.now());
-        fill.style.width = (grown ? 100 : Game.progress(p, Game.now()) * 100) + '%';
-        const tm = document.querySelector(`.time-${i}`); if (tm) tm.textContent = grown ? 'ready' : Game.fmtTime(Game.timeLeft(p, Game.now()));
+        const grown = Game.isGrown(p);
+        fill.style.width = (grown ? 100 : Game.progress(p) * 100) + '%';
+        const tm = document.querySelector(`.time-${i}`); if (tm) tm.textContent = grown ? 'ready' : Game.fmtTime(Game.timeLeft(p));
         const sb = document.querySelector(`[data-sell="${i}"]`); if (sb) sb.classList.toggle('disabled', !grown);
         const bo = document.querySelector(`.row.planter[data-i="${i}"] .bar`); if (bo) bo.classList.toggle('done', grown);
       }
@@ -340,18 +328,11 @@ const UI = (() => {
       const mana = Math.floor(G().mana), mmax = Game.manaMax();
       const mf = el('manaFill'); if (mf) mf.style.width = (mana / mmax * 100) + '%';
       const mn = el('manaNum'); if (mn) mn.textContent = mana + '/' + mmax;
-      const matched = Game.matchedSpell(); const cb = el('castBtn');
-      if (matched && cb) cb.classList.toggle('disabled', !Game.canCast(matched));
-    }
-    const hb = el('hasteBadge');
-    if (hb) {
-      if (Game.hasteActive()) { hb.style.display = 'inline-flex'; hb.textContent = '⚡ ' + Game.fmtTime((G().hasteUntil - Game.now()) / 1000); }
-      else hb.style.display = 'none';
+      const cb = el('castBtn'); if (cb) cb.classList.toggle('disabled', !Game.canCastRitual());
     }
   }
 
   function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-
   function toast(html) {
     const t = el('toast'); t.innerHTML = html; t.classList.add('show');
     clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 5000);
