@@ -10,8 +10,9 @@ const Game = (() => {
     cents = Math.floor(cents);
     if (cents < 100) return cents + '¢';
     const d = cents / 100;
+    const trim = n => n.toFixed(2).replace(/\.?0+$/, '');
     const suf = [[1e15, 'Q'], [1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']];
-    for (const [v, s] of suf) if (d >= v) return '$' + (d / v).toFixed(2) + s;
+    for (const [v, s] of suf) if (d >= v) return '$' + trim(d / v) + s;
     return Number.isInteger(d) ? '$' + d : '$' + d.toFixed(2);
   }
   function fmtTime(s) {
@@ -26,8 +27,26 @@ const Game = (() => {
 
   /* ---------- derived stats ---------- */
   function multiplier() {
-    return 1 + state.ritualLevel + (state.items.notebook > 0 ? 1 : 0);
+    return 1 + state.ritualLevel;
   }
+  function has(itemId) { return (state.items[itemId] || 0) > 0; }
+  function tabUnlocked(tabId) {
+    const tab = TABS.find(t => t.id === tabId);
+    return !tab || !tab.needs || has(tab.needs);
+  }
+  function avgPlantedSell(includeLast) {
+    const vals = state.planters
+      .map(p => p.seed || (includeLast ? p.lastSeed : null))
+      .filter(Boolean)
+      .map(id => SEEDS_BY_ID[id].sell);
+    if (!vals.length) return 0;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  }
+  function ledgerPerSec(includeLast) {
+    if (!has('ledger')) return 0;
+    return CONFIG.ledgerRate * avgPlantedSell(includeLast) * multiplier();
+  }
+  function autoOn(p) { return p.repeat || has('auto-harvester'); }
   function hasteActive() { return now() < (state.hasteUntil || 0); }
   function growthSpeed() {
     return 1 + (hasteActive() ? CONFIG.quickenSpeedBonus : 0);
@@ -94,6 +113,7 @@ const Game = (() => {
       candles: [makeCandle(), makeCandle(), makeCandle(), makeCandle()],
       mana: 0,
       hasteUntil: 0,
+      notes: {},
       lastTick: now(),
     };
   }
@@ -217,15 +237,16 @@ const Game = (() => {
   function tick(t) {
     const dt = Math.max(0, (t - state.lastTick) / 1000);
     state.mana = Math.min(manaMax(), state.mana + manaRegen() * dt);
+    if (dt > 0) { const inc = ledgerPerSec(false) * dt; if (inc > 0) earn(inc); }
     for (const p of state.planters) {
       if (p.seed) {
-        if (isGrown(p, t) && p.repeat) {
+        if (isGrown(p, t) && autoOn(p)) {
           earn(SEEDS_BY_ID[p.seed].sell * multiplier());
           const seed = SEEDS_BY_ID[p.lastSeed];
           if (p.lastSeed && state.cents >= seed.cost) { state.cents -= seed.cost; p.seed = p.lastSeed; p.start = t; }
           else { p.seed = null; p.start = null; }
         }
-      } else if (p.repeat && p.lastSeed) {
+      } else if (autoOn(p) && p.lastSeed) {
         const seed = SEEDS_BY_ID[p.lastSeed];
         if (state.cents >= seed.cost) { state.cents -= seed.cost; p.seed = p.lastSeed; p.start = t; }
       }
@@ -242,6 +263,8 @@ const Game = (() => {
     const mult = multiplier();
     // offline assumes no haste (buff would have expired) → base grow time
     let gained = 0;
+    // ledger passive income (based on what is/was planted)
+    gained += ledgerPerSec(true) * dt;
     for (const p of state.planters) {
       if (p.seed) {
         const seed = SEEDS_BY_ID[p.seed];
@@ -249,11 +272,11 @@ const Game = (() => {
         const already = (state.lastTick - p.start) / 1000;
         const left = Math.max(0, g - already);
         if (dt < left) continue;
-        if (!p.repeat) { p.start = t - g * 1000; continue; }
+        if (!autoOn(p)) { p.start = t - g * 1000; continue; }
         const cycles = 1 + Math.floor((dt - left) / g);
         gained += cycles * (seed.sell * mult - seed.cost);
         p.start = t - ((dt - left) % g) * 1000;
-      } else if (p.repeat && p.lastSeed) {
+      } else if (autoOn(p) && p.lastSeed) {
         const seed = SEEDS_BY_ID[p.lastSeed];
         const g = seed.grow;
         const cycles = Math.floor(dt / g);
@@ -281,6 +304,7 @@ const Game = (() => {
         state = Object.assign(freshState(), JSON.parse(raw));
         state.items = Object.assign({ planter: 0, candle: 0, map: 0, notebook: 0 }, state.items || {});
         if (typeof state.mana !== 'number') state.mana = 0;
+        if (!state.notes || typeof state.notes !== 'object') state.notes = {};
         if (!Array.isArray(state.planters) || !state.planters.length) state.planters = [makePlanter()];
         state.planters = state.planters.map(p => Object.assign(makePlanter(), p));
         if (!Array.isArray(state.candles) || state.candles.length !== 4)
@@ -295,20 +319,21 @@ const Game = (() => {
     return false;
   }
   function reset() { state = freshState(); save(); }
+  function setNote(spellId, text) { state.notes[spellId] = text; }
 
   /* ---------- public API ---------- */
   return {
     get state() { return state; },
     fmtMoney, fmtTime, now,
     multiplier, growthSpeed, hasteActive, effGrow, slotCount,
-    manaMax, manaRegen,
+    manaMax, manaRegen, has, tabUnlocked, avgPlantedSell, ledgerPerSec, autoOn,
     itemPrice, itemStockLeft, itemSoldOut, nextLockedSeed,
     ritualUnlocked, candleCount, devotionCost,
     spellPattern, matchedSpell, canCast,
     plant, sell, toggleRepeat, buyItem,
-    toggleCandle, setRune, cycleRune, castSpell,
+    toggleCandle, setRune, cycleRune, castSpell, setNote,
     isGrown, progress, timeLeft,
     tick, applyOffline, save, load, reset,
-    SEEDS, ITEMS, RUNES, SPELLS, SEEDS_BY_ID, ITEMS_BY_ID, RUNES_BY_ID, SPELLS_BY_ID, CONFIG,
+    SEEDS, ITEMS, TABS, RUNES, SPELLS, SEEDS_BY_ID, ITEMS_BY_ID, RUNES_BY_ID, SPELLS_BY_ID, CONFIG,
   };
 })();
