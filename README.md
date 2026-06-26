@@ -5,7 +5,7 @@ your cult, and invoke runic rituals.
 
 ## ▶ Play
 
-**https://nors3ai.github.io/idle-cult/**
+**https://nors3ai.github.io/Idle-Cult/**
 
 Runs entirely in the browser (GitHub Pages, served from `main` → `/docs`).
 Progress auto-saves to your device and continues while you're away.
