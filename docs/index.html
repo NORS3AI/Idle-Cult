@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0b0b" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <title>Idle Cult</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="phone">
+    <!-- status bar -->
+    <div class="statusbar">
+      <div class="sb-left"><span id="statusTime">7:32</span></div>
+      <div class="sb-right">
+        <span class="sb-cell">▂▄▆█</span>
+        <span class="sb-wifi">◗</span>
+        <span class="sb-batt">56</span>
+      </div>
+    </div>
+
+    <!-- header -->
+    <header class="topbar">
+      <button id="homeBtn" class="home-btn" aria-label="home">⌂</button>
+      <div id="money" class="money">10¢</div>
+      <div class="top-right">
+        <span id="hasteBadge" class="haste-badge"></span>
+        <span class="mult-chip">×<span id="mult">1</span></span>
+        <button id="menuBtn" class="menu-btn" aria-label="menu">⋯</button>
+      </div>
+      <div id="menu" class="menu">
+        <button id="menuReset">Abandon &amp; reset</button>
+        <div class="menu-note">Idle Cult · auto-saves locally</div>
+      </div>
+    </header>
+
+    <main class="content">
+      <!-- BUY -->
+      <section class="card">
+        <h2 class="card-title">Buy</h2>
+        <button id="buyToggle" class="collapse-bar top"><span id="buyChevron" class="chevron">⌃</span></button>
+        <div id="buyList" class="list"></div>
+      </section>
+
+      <!-- SEEDS -->
+      <section class="card">
+        <h2 class="card-title">Seeds</h2>
+        <div id="seedList" class="list"></div>
+      </section>
+
+      <!-- PLANTERS -->
+      <section class="card">
+        <h2 class="card-title">Planters</h2>
+        <div id="planterList" class="list"></div>
+      </section>
+
+      <!-- RITUAL -->
+      <section id="ritualCard" class="card ritual locked">
+        <h2 class="card-title">Ritual slate</h2>
+        <div id="ritualBody" class="ritual-body"></div>
+      </section>
+
+      <div class="footer">a small idle game · grow · sell · invoke</div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <div id="fx" class="fx"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
