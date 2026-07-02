@@ -153,7 +153,7 @@ const _y = 31536000, _d = 86400;   // seconds in a year / day
 const AREAS = [
   { id: 'dulling', name: 'The Dulling', icon: '🌗',
     flavor: 'The between of the light and the dark',
-    visitCost: _c(20), duration: 60,               /* ×10 ≈ 0.12s */
+    visitCost: _c(20), duration: 512,              /* ×10 = 1s */
     riskMin: 5, riskMax: 14, dmg: 1, trinketChance: 0,
     cashMin: _c(23), cashMax: _c(56), manaMin: 10, manaMax: 25, bloodMin: 0, bloodMax: 0,
     events: [
@@ -166,7 +166,7 @@ const AREAS = [
     ] },
   { id: 'blacktide', name: 'Blacktide Bay', icon: '🏴‍☠️',
     flavor: 'A coastal hideout where contraband and pirates lay in hiding',
-    visitCost: _c(200), duration: 240,             /* ×10 ≈ 0.47s */
+    visitCost: _c(200), duration: 1536,            /* ×10 = 3s */
     riskMin: 29, riskMax: 56, dmg: 6, trinketChance: 0.01,
     cashMin: _c(281), cashMax: _c(521), manaMin: 59, manaMax: 149, bloodMin: 1, bloodMax: 2,
     events: [
@@ -178,7 +178,7 @@ const AREAS = [
     ] },
   { id: 'cathedral', name: "Mad Max's Cathedral", icon: '⛪',
     flavor: 'A decrepit church filled with the dead and dust',
-    visitCost: _c(3000), duration: 3600,           /* ×10 ≈ 7s */
+    visitCost: _c(3000), duration: 4096,           /* ×10 = 8s */
     riskMin: 251, riskMax: 300, dmg: 40, trinketChance: 0.04,
     cashMin: _c(4460), cashMax: _c(7520), manaMin: 507, manaMax: 689, bloodMin: 3, bloodMax: 15,
     events: [
@@ -189,7 +189,7 @@ const AREAS = [
     ] },
   { id: 'windsor', name: 'Windsor Castle', icon: '🏰',
     flavor: 'A fortress hiding a hidden darkness',
-    visitCost: _c(80000), duration: 16 * 3600,     /* 16h · ×10 ≈ 112s */
+    visitCost: _c(80000), duration: 9728,          /* ×10 = 19s */
     riskMin: 1920, riskMax: 2280, dmg: 300, trinketChance: 0.07,
     cashMin: _c(120000), cashMax: _c(200000), manaMin: 7090, manaMax: 8880, bloodMin: 38, bloodMax: 71,
     events: [
@@ -200,7 +200,7 @@ const AREAS = [
     ] },
   { id: 'bright', name: 'The Bright Court', icon: '☀️',
     flavor: 'The High Heavens on earth',
-    visitCost: _c(2e6), duration: 15 * _d,         /* 15d · ×10 ≈ 42m */
+    visitCost: _c(2e6), duration: 13824,           /* ×10 = 27s */
     riskMin: 16300, riskMax: 18900, dmg: 2500, trinketChance: 0.11,
     cashMin: _c(2.9e6), cashMax: _c(5.1e6), manaMin: 855, manaMax: 1260, bloodMin: 190, bloodMax: 255, // cash inferred
     events: [
@@ -211,7 +211,7 @@ const AREAS = [
     ] },
   { id: 'forgotten', name: 'The Forgotten Court', icon: '🌲',
     flavor: 'Where the forgotten things roam',
-    visitCost: _c(90e6), duration: 369 * _d,       /* 369d · ×10 ≈ 17h */
+    visitCost: _c(90e6), duration: 20992,          /* ×10 = 41s */
     riskMin: 112000, riskMax: 125000, dmg: 17000, trinketChance: 0.17,
     cashMin: _c(135e6), cashMax: _c(322e6), manaMin: 12500, manaMax: 18000, bloodMin: 533, bloodMax: 640,
     events: [
@@ -222,9 +222,9 @@ const AREAS = [
     ] },
   { id: 'void', name: 'The Void', icon: '🌌',
     flavor: "Nyl'Thraxil was born from the throat of a dying star",
-    visitCost: _c(130e12), duration: 30 * _y,      /* 30y · ×10 ≈ 21d */
+    visitCost: _c(130e12), duration: 33792,        /* ×10 = 66s */
     riskMin: 5450000, riskMax: 9000000, dmg: 1e6, trinketChance: 0.29,
-    cashMin: _c(3e12), cashMax: _c(46e12), manaMin: 651e6, manaMax: 1.1e9, bloodMin: 65e6, bloodMax: 119e6, // cash < visit cost (as given)
+    cashMin: _c(200e12), cashMax: _c(400e12), manaMin: 651e6, manaMax: 1.1e9, bloodMin: 65e6, bloodMax: 119e6, // ~1.5-3× the $130t visit cost
     bosses: ["Nyl'Thraxil", "Vyx'alith", "Dra'vah", "Mal'khorith", 'Cadence'],
     events: [
       { name: 'cold silence', w: 8, d: 0 }, { name: 'distant star', w: 7, d: 0 }, { name: 'stardust', w: 7, d: 0 },

@@ -300,8 +300,9 @@ body { display: flex; justify-content: center; min-height: 100vh; }
   text-shadow: 0 0 10px rgba(231,196,107,.35);
   opacity: 0; pointer-events: none; transition: opacity .45s ease;
 }
-.slate-rune.shown { opacity: 1; pointer-events: auto; }
+.slate-rune.shown { opacity: 1; pointer-events: auto; animation: runeFade .4s ease; }
 .slate-rune.shown:active { transform: scale(.9); }
+@keyframes runeFade { from { opacity: 0; } to { opacity: 1; } }
 .pos-top    { top: 24%; left: 50%; transform: translateX(-50%); }
 .pos-bottom { bottom: 20%; left: 50%; transform: translateX(-50%); }
 .pos-left   { left: 28%; top: 50%; transform: translateY(-50%); }
@@ -317,7 +318,10 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 .slate-hint {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
   color: var(--muted); font-size: 13px; text-align: center; width: 70%;
+  pointer-events: none;              /* never intercept rune taps */
 }
+.rune-seq { pointer-events: none; }   /* the × re-enables itself below */
+.seq-x { pointer-events: auto; }
 
 .nb-auto { min-width: 92px; }
 .nb-intro { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
