@@ -218,6 +218,13 @@ const CONFIG = {
 
 /* Patch notes — newest first. Shown in Settings. */
 const PATCH_NOTES = [
+  { v: '1.2', title: 'Save fixes, rune tapping, Wipe Save', items: [
+    'Refreshing no longer resets progress — saves (even old ones) always restore; corrupt saves are backed up, not lost.',
+    'Fixed runes not being tappable (the ritual circle was intercepting taps).',
+    'Each candle now fades its rune in when lit and out when snuffed.',
+    'Notebook Cast casts once per tap — tap as many times as you like.',
+    'Settings has a "Wipe Save" button with an "Are you sure :(" confirm — the only way to erase your save.',
+  ] },
   { v: '1.1', title: 'Dashboard layout & Notebook', items: [
     'Grove is now a two-column dashboard: Upgrades / Planters / Prestige / Daily quests on the left; Seeds / Ritual slate / Notebook on the right.',
     'Top tabs are just Grove / Combat / Research; the clock sits top-left with speed and settings top-right.',

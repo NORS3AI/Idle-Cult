@@ -247,11 +247,13 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 .slate::before {  /* ritual circle */
   content: ""; position: absolute; inset: 22%;
   border: 1px solid rgba(231,196,107,.18); border-radius: 50%;
+  pointer-events: none;            /* never intercept rune taps */
 }
 .slate::after {
   content: ""; position: absolute; inset: 30%;
   border: 1px solid rgba(231,196,107,.1);
   transform: rotate(45deg);
+  pointer-events: none;
 }
 
 .corner {
@@ -292,13 +294,15 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 .candle .rune.dim { color: #5a544a; text-shadow: none; }
 .candle.sel { outline: 2px solid rgba(231,196,107,.5); outline-offset: 4px; border-radius: 10px; }
 
-/* tappable runes at N/E/S/W (shown once all candles are lit) */
+/* tappable runes at N/E/S/W — each fades in with its candle */
 .slate-rune {
-  position: absolute; background: none; border: none; cursor: pointer;
-  color: #efe6cf; font-size: 30px; line-height: 1; padding: 8px;
+  position: absolute; z-index: 4; background: none; border: none; cursor: pointer;
+  color: #efe6cf; font-size: 30px; line-height: 1; padding: 12px;
   text-shadow: 0 0 10px rgba(231,196,107,.35);
+  opacity: 0; pointer-events: none; transition: opacity .45s ease;
 }
-.slate-rune:active { transform: scale(.9); }
+.slate-rune.shown { opacity: 1; pointer-events: auto; }
+.slate-rune.shown:active { transform: scale(.9); }
 .pos-top    { top: 24%; left: 50%; transform: translateX(-50%); }
 .pos-bottom { bottom: 20%; left: 50%; transform: translateX(-50%); }
 .pos-left   { left: 28%; top: 50%; transform: translateY(-50%); }
@@ -439,6 +443,9 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 .set-title { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
 .set-foot { color: var(--muted); font-size: 12px; text-align: center; padding-top: 12px; }
 .btn.danger { background: #3a1d1d; color: #e58f8f; width: 100%; }
+.wipe-confirm { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.wipe-confirm span { flex: 1; color: #e58f8f; font-weight: 600; }
+.wipe-confirm .btn { width: auto; min-width: 60px; }
 
 .dev-toggle { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; cursor: pointer; }
 .dev-toggle input { width: 20px; height: 20px; }

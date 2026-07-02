@@ -123,6 +123,8 @@ const Game = (() => {
   function allCandlesLit() {
     return candleCount() >= CONFIG.candleCount && state.candles.slice(0, CONFIG.candleCount).every(c => c.lit);
   }
+  // rune i (RUNES[i]) is revealed & tappable while its candle is lit
+  function runeShown(i) { return i < candleCount() && state.candles[i] && state.candles[i].lit; }
   function runeSeqStr() { return (state.runeSeq || []).join(''); }
   function applyRite(effect) {
     if (effect === 'halveRemaining') {
@@ -146,7 +148,8 @@ const Game = (() => {
   }
   // tap a rune letter → append to the sequence; cast when it exactly matches a spell
   function tapRune(letter) {
-    if (!allCandlesLit()) return null;
+    const i = RUNES.findIndex(r => r.id === letter);
+    if (i < 0 || !runeShown(i)) return null;      // only tappable while its candle is lit
     state.runeSeq = state.runeSeq || [];
     state.runeSeq.push(letter);
     state.runeSeqAt = now();
@@ -161,12 +164,6 @@ const Game = (() => {
     return null;
   }
   function clearRuneSeq() { state.runeSeq = []; }
-  function toggleAutoCast(id) {
-    if (!has('auto-ritual')) return;
-    state.autoCast = state.autoCast || {};
-    state.autoCast[id] = !state.autoCast[id];
-    if (state.autoCast[id]) castSpellById(id);   // cast once immediately
-  }
   function growthSpeed() {
     return 1 + (state.prestigePoints || 0) * CONFIG.prestigeSpeedPer
       + (has('thurible') ? CONFIG.thuribleHaste : 0)
@@ -219,7 +216,6 @@ const Game = (() => {
       discovered: ['rite_fdsa'],       // the first rite is given for free
       hasteStacks: 0,
       runeSeq: [], runeSeqAt: 0,
-      autoCast: {},
       notes: {},
       hpBought: 0, cashLootBought: 0, manaLootBought: 0,
       combat: null,
@@ -436,10 +432,6 @@ const Game = (() => {
     checkDailyReset();
     // rune sequence auto-clears after a while of no taps
     if (state.runeSeq && state.runeSeq.length && (t - (state.runeSeqAt || 0)) / 1000 > CONFIG.runeSeqTimeout) state.runeSeq = [];
-    // auto-ritual: auto-cast enabled rites while mana allows
-    if (has('auto-ritual') && state.autoCast) {
-      for (const id in state.autoCast) if (state.autoCast[id]) castSpellById(id);
-    }
     const sdt = dt * speedFactor();       // sped-up game seconds this frame
     state.mana += manaRegenPerSec() * sdt;
     const inc = ledgerPerSec(false) * sdt; if (inc > 0) earn(inc);
@@ -508,49 +500,51 @@ const Game = (() => {
   function save() {
     try { localStorage.setItem(CONFIG.saveKey, JSON.stringify(state)); } catch (e) {}
   }
+  // Defensively rebuild a valid state from any (possibly old-format) parsed save.
+  // This must never throw, so a refresh can always restore progress.
+  function sanitize(parsed) {
+    const s = Object.assign(freshState(), parsed || {});
+    s.items = Object.assign({ planter: 0, candle: 0, map: 0, notebook: 0 }, s.items || {});
+    if (typeof s.mana !== 'number') s.mana = 0;
+    s.discovered = (Array.isArray(s.discovered) ? s.discovered : []).filter(id => SPELLS_BY_ID[id]);
+    if (!s.discovered.includes('rite_fdsa')) s.discovered.unshift('rite_fdsa');
+    if (!Array.isArray(s.runeSeq)) s.runeSeq = [];
+    if (!s.notes || typeof s.notes !== 'object') s.notes = {};
+    if (!Array.isArray(s.trinkets)) s.trinkets = [];
+    ['hasteStacks', 'runeSeqAt', 'hpBought', 'cashLootBought', 'manaLootBought', 'prestigePoints', 'hpBonus', 'scrolls', 'dailyHarvests', 'dailyResetAt']
+      .forEach(k => { if (typeof s[k] !== 'number') s[k] = 0; });
+    ['prestigeUnlocked', 'devMode', 'hasPrestiged'].forEach(k => { if (typeof s[k] !== 'boolean') s[k] = false; });
+    if (!Array.isArray(s.questClaimed) || s.questClaimed.length !== DAILY_QUESTS.length) s.questClaimed = DAILY_QUESTS.map(() => false);
+    if (s.combat === undefined) s.combat = null;
+    if (!(s.gameSpeed >= 1 && s.gameSpeed <= CONFIG.maxSpeed)) s.gameSpeed = 1;
+    if (!Array.isArray(s.planters) || !s.planters.length) s.planters = [makePlanter()];
+    s.planters = s.planters.map(p => { const np = Object.assign(makePlanter(), p); if (typeof np.prog !== 'number') np.prog = 0; delete np.start; return np; });
+    if (!Array.isArray(s.candles) || s.candles.length !== 4) s.candles = [makeCandle(), makeCandle(), makeCandle(), makeCandle()];
+    s.candles = s.candles.map(c => ({ lit: !!(c && c.lit) }));
+    if (!Array.isArray(s.unlockedSeeds) || !s.unlockedSeeds.length) s.unlockedSeeds = ['radish'];
+    if (typeof s.lastTick !== 'number') s.lastTick = now();
+    return s;
+  }
   function load() {
-    try {
-      const raw = localStorage.getItem(CONFIG.saveKey);
-      if (raw) {
-        state = Object.assign(freshState(), JSON.parse(raw));
-        state.items = Object.assign({ planter: 0, candle: 0, map: 0, notebook: 0 }, state.items || {});
-        if (typeof state.mana !== 'number') state.mana = 0;
-        // migrate rituals to the sequence system
-        state.discovered = (Array.isArray(state.discovered) ? state.discovered : []).filter(id => SPELLS_BY_ID[id]);
-        if (!state.discovered.includes('rite_fdsa')) state.discovered.unshift('rite_fdsa');
-        if (typeof state.hasteStacks !== 'number') state.hasteStacks = 0;
-        if (!Array.isArray(state.runeSeq)) state.runeSeq = [];
-        if (typeof state.runeSeqAt !== 'number') state.runeSeqAt = 0;
-        if (!state.autoCast || typeof state.autoCast !== 'object') state.autoCast = {};
-        if (!state.notes || typeof state.notes !== 'object') state.notes = {};
-        if (!Array.isArray(state.trinkets)) state.trinkets = [];
-        ['hpBought', 'cashLootBought', 'manaLootBought', 'prestigePoints', 'hpBonus', 'scrolls', 'dailyHarvests', 'dailyResetAt'].forEach(k => { if (typeof state[k] !== 'number') state[k] = 0; });
-        if (typeof state.prestigeUnlocked !== 'boolean') state.prestigeUnlocked = false;
-        if (typeof state.devMode !== 'boolean') state.devMode = false;
-        if (typeof state.hasPrestiged !== 'boolean') state.hasPrestiged = false;
-        if (!Array.isArray(state.questClaimed) || state.questClaimed.length !== DAILY_QUESTS.length) state.questClaimed = DAILY_QUESTS.map(() => false);
-        checkDailyReset();
-        if (state.combat === undefined) state.combat = null;
-        if (!(state.gameSpeed >= 1 && state.gameSpeed <= CONFIG.maxSpeed)) state.gameSpeed = 1;
-        if (!Array.isArray(state.planters) || !state.planters.length) state.planters = [makePlanter()];
-        state.planters = state.planters.map(p => {
-          const np = Object.assign(makePlanter(), p);
-          if (typeof np.prog !== 'number') np.prog = 0;   // migrate old timestamp saves
-          delete np.start;
-          return np;
-        });
-        if (!Array.isArray(state.candles) || state.candles.length !== 4)
-          state.candles = [makeCandle(), makeCandle(), makeCandle(), makeCandle()];
-        state.candles = state.candles.map(c => Object.assign(makeCandle(), c));
-        if (!Array.isArray(state.unlockedSeeds) || !state.unlockedSeeds.length) state.unlockedSeeds = ['radish'];
-        syncSlots(); checkUnlocks();
-        return true;
-      }
-    } catch (e) {}
-    state = freshState();
-    return false;
+    let raw = null;
+    try { raw = localStorage.getItem(CONFIG.saveKey); } catch (e) {}
+    if (!raw) { state = freshState(); return false; }
+    let parsed;
+    try { parsed = JSON.parse(raw); }
+    catch (e) {                              // truly corrupt JSON — keep a copy, start fresh
+      try { localStorage.setItem(CONFIG.saveKey + '-corrupt', raw); } catch (e2) {}
+      state = freshState(); return false;
+    }
+    try { state = sanitize(parsed); }
+    catch (e) { state = Object.assign(freshState(), parsed); }  // last resort: keep raw fields
+    try { checkDailyReset(); syncSlots(); checkUnlocks(); } catch (e) {}
+    return true;
   }
   function reset() { state = freshState(); save(); }
+  function wipe() {                          // hard delete the save file
+    try { localStorage.removeItem(CONFIG.saveKey); } catch (e) {}
+    state = freshState(); save();
+  }
   function setNote(spellId, text) { state.notes[spellId] = text; }
 
   /* ---------- dev panel ---------- */
@@ -577,13 +571,13 @@ const Game = (() => {
     maxHp, hpAdded, cashLootPct, manaLootPct, fieldCost, fieldNextAmount,
     itemPrice, itemStockLeft, itemSoldOut, nextLockedSeed,
     ritualUnlocked, candleCount, toggleCandle,
-    allCandlesLit, runeSeqStr, tapRune, clearRuneSeq, castSpellById, toggleAutoCast,
+    allCandlesLit, runeShown, runeSeqStr, tapRune, clearRuneSeq, castSpellById,
     combat, startExpedition, togglePause, buyField, collectLoot, dismissDeath, shieldTier,
     prestigeUnlocked, pendingPrestige, prestigePoints, doPrestige,
     dailyActive, dailyTimeLeft, questProgress, questClaimable, claimQuest, allQuestsClaimed,
     plant, sell, replantSpot, toggleRepeat, buyItem, setNote,
     isGrown, progress, timeLeft,
-    tick, applyOffline, save, load, reset,
+    tick, applyOffline, save, load, reset, wipe,
     SEEDS, ITEMS, TABS, RUNES, SPELLS, AREAS, FIELD_UPGRADES, AREAS_BY_ID, PATCH_NOTES, DAILY_QUESTS,
     SEEDS_BY_ID, ITEMS_BY_ID, RUNES_BY_ID, SPELLS_BY_ID, CONFIG,
   };
