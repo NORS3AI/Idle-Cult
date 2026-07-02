@@ -468,7 +468,8 @@ const UI = (() => {
       <div class="prestige-stat"><span>Points</span><b>${pts}</b></div>
       <div class="prestige-stat"><span>Plant speed</span><b>+${speed}%</b></div>
       <div class="prestige-stat"><span>Ready to claim</span><b id="pPend" class="good">+${Game.pendingPrestige()}</b></div>
-      <div class="prestige-note">+1 point per $50 earned. Prestiging resets everything but points; each point = +1% plant speed.</div>
+      <div class="prestige-stat"><span>Next point costs</span><b id="pNext">${Game.fmtMoney(Game.prestigeNextCost())}</b></div>
+      <div class="prestige-note">Points start at $50 and cost 10% more each. Prestiging resets everything but points; each point = +1% plant speed.</div>
       <button class="btn primary prestige-btn" id="prestigeBtn">Prestige</button>`;
     const b = el('prestigeBtn');
     if (b) b.addEventListener('click', () => {

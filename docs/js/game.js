@@ -50,7 +50,14 @@ const Game = (() => {
 
   /* ---------- prestige ---------- */
   function prestigeUnlocked() { return !!state.prestigeUnlocked; }
-  function pendingPrestige() { return Math.floor(state.totalEarned / CONFIG.prestigePer); }
+  // cost (cents) of the NEXT point given how many you already have
+  function prestigeNextCost() { return CONFIG.prestigeBase * Math.pow(CONFIG.prestigeGrowth, state.prestigePoints || 0); }
+  // how many points this run's earnings can buy, costs escalating 10% each
+  function pendingPrestige() {
+    const g = CONFIG.prestigeGrowth, base = prestigeNextCost();
+    const ratio = 1 + state.totalEarned * (g - 1) / base;
+    return ratio <= 1 ? 0 : Math.floor(Math.log(ratio) / Math.log(g));
+  }
   function prestigePoints() { return state.prestigePoints || 0; }
   function doPrestige() {
     const gain = pendingPrestige();
@@ -97,7 +104,7 @@ const Game = (() => {
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   }
   function ledgerPerSec() {
-    return has('ledger') ? CONFIG.ledgerFlat : 0;   // flat $0.40/s
+    return has('ledger') ? CONFIG.ledgerFlat : 0;   // flat $0.04/s
   }
   function autoHarvest() { return has('auto-harvester') && state.autoHarvestOn !== false; }
   function autoHarvestOn() { return state.autoHarvestOn !== false; }   // checkbox state (default on)
@@ -490,7 +497,7 @@ const Game = (() => {
     // rune sequence auto-clears after a while of no taps
     if (state.runeSeq && state.runeSeq.length && (t - (state.runeSeqAt || 0)) / 1000 > CONFIG.runeSeqTimeout) state.runeSeq = [];
     const sdt = dt * speedFactor();       // sped-up game seconds this frame
-    state.mana += manaRegenPerSec() * sdt;
+    // mana no longer regenerates passively — it only comes from combat or the dev panel
     const inc = ledgerPerSec(false) * sdt; if (inc > 0) earn(inc);
     const auto = autoHarvest();
     for (const p of state.planters) {
@@ -531,7 +538,7 @@ const Game = (() => {
     // offline advances at real time (game-speed only applies to active play).
     // Auto-harvester cycles are limited by the mana that accrues while away.
     const auto = autoHarvest();
-    let manaAvail = state.mana + manaRegenPerSec() * dt;
+    let manaAvail = state.mana;                 // mana does not regenerate while away
     for (const p of state.planters) {
       if (!p.seed) continue;
       const seed = SEEDS_BY_ID[p.seed];
@@ -548,7 +555,7 @@ const Game = (() => {
       p.prog = (p.prog - g) % g; p.riteCount = 0;    // carry remainder into the next (fresh) crop
     }
     if (gained > 0) earn(gained);
-    state.mana = manaAvail;                          // leftover (includes accrued regen)
+    state.mana = manaAvail;                          // leftover after any auto-harvest spend
     state.lastTick = t;
     return gained > 0 ? { seconds: dt, gained } : null;
   }
@@ -642,7 +649,7 @@ const Game = (() => {
     allCandlesLit, runeShown, runeSeqStr, tapRune, clearRuneSeq, castSpellById,
     combat, startExpedition, togglePause, buyField, collectLoot, dismissDeath, shieldTier,
     trinketBonus, ownedTrinkets, activateTrinket,
-    prestigeUnlocked, pendingPrestige, prestigePoints, doPrestige,
+    prestigeUnlocked, pendingPrestige, prestigePoints, prestigeNextCost, doPrestige,
     dailyActive, dailyTimeLeft, questProgress, questClaimable, claimQuest, allQuestsClaimed,
     plant, sell, replantSpot, toggleRepeat, buyItem, setNote,
     isGrown, progress, timeLeft,
