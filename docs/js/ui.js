@@ -8,6 +8,8 @@ const UI = (() => {
   let buyPage = 0;
   let selectedCandle = null;
   let activeTab = 'home';
+  let buyMult = 1;                 // field-upgrade buy quantity (× stepper)
+  const MULTS = [1, 5, 10, 25];
   let lastSig = '';
 
   const el = id => document.getElementById(id);
@@ -57,6 +59,10 @@ const UI = (() => {
       Game.ritualReady(),
       (s.discovered || []).join(','),
       s.planters.map(p => (p.seed || ('_' + (p.lastSeed || ''))) + (p.repeat ? 'R' : '')).join('|'),
+      // combat
+      s.combat ? s.combat.status + s.combat.log.length : 'nocombat',
+      s.hpBought + '/' + s.cashLootBought + '/' + s.manaLootBought,
+      buyMult, (s.trinkets || []).length,
     ].join(';');
   }
 
@@ -65,6 +71,9 @@ const UI = (() => {
     el('money').textContent = Game.fmtMoney(G().cents);
     el('mult').textContent = Game.speed();
     el('speedBtn').classList.toggle('fast', Game.speed() > 1);
+    const mt = el('manaTop');
+    mt.innerHTML = '✦&nbsp;' + Math.floor(G().mana);
+    mt.style.display = Game.ritualUnlocked() ? 'inline-flex' : 'none';
   }
   function renderTabs() {
     if (!Game.tabUnlocked(activeTab)) activeTab = 'home';
@@ -211,13 +220,6 @@ const UI = (() => {
       center = `<div class="slate-center hint">Light all four candles — <b>one of each rune</b>.</div>`;
     }
 
-    const mana = Math.floor(G().mana), mmax = Game.manaMax();
-    const manaBar = `<div class="mana-row">
-        <span class="mana-label">✦ mana</span>
-        <div class="bar mana"><div class="bar-fill" id="manaFill" style="width:${(mana / mmax) * 100}%"></div></div>
-        <span class="mana-num" id="manaNum">${mana}/${mmax}</span>
-      </div>`;
-
     let picker = '';
     if (selectedCandle != null && selectedCandle < count) {
       const cur = G().candles[selectedCandle];
@@ -228,7 +230,7 @@ const UI = (() => {
     }
 
     const note = `<div class="rite-hint">What a rite does is for you to discover — record it in your <b>Notebook</b>.</div>`;
-    body.innerHTML = `${manaBar}<div class="slate">${cornersHtml}${center}</div>${picker}${note}`;
+    body.innerHTML = `<div class="slate">${cornersHtml}${center}</div>${picker}${note}`;
 
     body.querySelectorAll('[data-candle]').forEach(c => c.addEventListener('click', () => {
       const i = +c.dataset.candle; selectedCandle = (selectedCandle === i) ? null : i; forceRebuild(); render();
@@ -274,11 +276,113 @@ const UI = (() => {
     body.querySelectorAll('[data-note]').forEach(t => t.addEventListener('input', () => { Game.setNote(t.dataset.note, t.value); Game.save(); }));
   }
 
-  /* ---------- COMBAT / RESEARCH placeholders ---------- */
+  /* ---------- COMBAT ---------- */
+  function heartRow(n) { return `<span class="hp-badge">❤ ${n}</span>`; }
+
   function renderCombat() {
-    el('combatBody').innerHTML = `<div class="tab-placeholder"><div class="tp-icon">⚔</div>
-        <p>The map reveals roads out of the grove — skirmishes and rival covens await.</p>
-        <p class="muted">Combat is being prepared — check back soon.</p></div>`;
+    const body = el('combatBody');
+    const c = Game.combat();
+    if (!c) { body.innerHTML = renderAreaPicker(); bindAreaPicker(body); return; }
+
+    const area = Game.AREAS_BY_ID[c.areaId];
+    const pct = Math.min(1, c.elapsed / c.duration);
+    const running = c.status === 'running';
+
+    // event log (newest at the bottom)
+    const logHtml = c.log.slice(-9).map(e => {
+      const bits = [];
+      if (e.dmg) bits.push(`<span class="ev-hp">❤ -${e.dmg}</span>`);
+      if (e.cash) bits.push(`<span class="ev-cash">${Game.fmtMoney(e.cash)}</span>`);
+      if (e.mana) bits.push(`<span class="ev-mana">✦ ${e.mana}</span>`);
+      return `<div class="ev-row"><span class="ev-t">${Game.fmtTime(e.t)}</span><span class="ev-name">${e.name}</span><span class="ev-eff">${bits.join(', ')}</span></div>`;
+    }).join('') || '<div class="ev-row muted"><span class="ev-name">The expedition begins…</span></div>';
+
+    // field upgrades
+    const upg = Game.FIELD_UPGRADES.map(f => {
+      const cost = Game.fieldCost(f.id);
+      const costHtml = cost.mana != null ? `✦ ${cost.mana}` : Game.fmtMoney(cost.cash);
+      let head, small;
+      if (f.id === 'shield') { head = `🛡 +${f.minutes}m`; small = Game.fmtTime(c.shieldRemaining) + ' left'; }
+      else if (f.id === 'hp') { head = `❤ +${Game.fieldNextAmount('hp')}`; small = `+${Game.hpAdded()} total`; }
+      else if (f.id === 'cashloot') { head = `$ +1% loot`; small = `+${G().cashLootBought}%`; }
+      else { head = `✦ +1% loot`; small = `+${G().manaLootBought}%`; }
+      return `<button class="upg" data-field="${f.id}" ${running ? '' : 'disabled'}>
+          <div class="upg-head">${head}</div>
+          <div class="upg-cost">${costHtml}</div>
+          <div class="upg-small">${small}</div>
+        </button>`;
+    }).join('');
+
+    let footer;
+    if (running) {
+      footer = `<div class="run-foot">
+          <div class="loot-now">${Game.fmtMoney(c.runCash)}, ✦ ${c.runMana}</div>
+          <button class="btn" id="fleeBtn">Flee with loot</button>
+        </div>`;
+    } else if (c.status === 'complete') {
+      footer = `<div class="run-foot done">
+          <div class="foot-msg">✔ Expedition complete!</div>
+          <div class="loot-now">${Game.fmtMoney(c.reward.cash)}, ✦ ${c.reward.mana}</div>
+          <button class="btn primary" id="collectBtn">Collect loot</button>
+        </div>`;
+    } else { // dead
+      footer = `<div class="run-foot dead">
+          <div class="foot-msg">💀 You died — loot lost.</div>
+          <button class="btn" id="dieBtn">Back to the grove</button>
+        </div>`;
+    }
+
+    body.innerHTML = `
+      <div class="loc-head">
+        <div class="loc-title">${area.icon} ${area.name}</div>
+        <div class="loc-sub">Risk: ❤ ${area.riskMin}–${area.riskMax}</div>
+        <div class="loc-sub">Reward: ${Game.fmtMoney(area.cashMin)}–${Game.fmtMoney(area.cashMax)}, ✦ ${area.manaMin}–${area.manaMax}</div>
+      </div>
+      <div class="prog-head"><span>Progress</span>
+        <span class="prog-right"><span id="progTime">${running ? Game.fmtTime((c.duration - c.elapsed) / Game.speed()) : ''}</span>
+        ${running ? `<button class="pause-btn ${c.paused ? 'paused' : ''}" id="pauseBtn">${c.paused ? '▶' : '⏸'}</button>` : ''}</span></div>
+      ${bar(pct, 'combat')}
+      <div class="combat-cols">
+        <div class="log-col">
+          <div class="col-title">Event Log <span class="hp-inline" id="hpNow">${heartRow(c.hp)}</span></div>
+          <div class="event-log" id="eventLog">${logHtml}</div>
+        </div>
+        <div class="upg-col">
+          <div class="col-title">Field upgrades <span class="mult-step"><button data-mult="-">−</button><b id="multN">×${buyMult}</b><button data-mult="+">+</button></span></div>
+          <div class="upg-grid">${upg}</div>
+        </div>
+      </div>
+      ${footer}`;
+
+    // handlers
+    const on = (id, fn) => { const e = el(id); if (e) e.addEventListener('click', fn); };
+    on('pauseBtn', () => { Game.togglePause(); act(true); });
+    on('fleeBtn', () => { const r = Game.collectLoot(); toast(`Fled with <b>${Game.fmtMoney(r.cash)}</b> &amp; <b>✦${r.mana}</b>.`); act(true); });
+    on('collectBtn', () => { const r = Game.collectLoot(); toast(`Collected <b>${Game.fmtMoney(r.cash)}</b> &amp; <b>✦${r.mana}</b>.${r.trinket ? ' A trinket dropped!' : ''}`); act(true); });
+    on('dieBtn', () => { Game.dismissDeath(); act(true); });
+    body.querySelectorAll('[data-field]').forEach(b => b.addEventListener('click', () => act(Game.buyField(b.dataset.field, buyMult))));
+    body.querySelectorAll('[data-mult]').forEach(b => b.addEventListener('click', () => {
+      const i = MULTS.indexOf(buyMult);
+      buyMult = b.dataset.mult === '+' ? MULTS[Math.min(MULTS.length - 1, i + 1)] : MULTS[Math.max(0, i - 1)];
+      forceRebuild(); render();
+    }));
+  }
+
+  function renderAreaPicker() {
+    let cards = Game.AREAS.map(a => `
+      <div class="area-card">
+        <div class="loc-title">${a.icon} ${a.name}</div>
+        <div class="loc-sub">Risk: ❤ ${a.riskMin}–${a.riskMax}</div>
+        <div class="loc-sub">Reward: ${Game.fmtMoney(a.cashMin)}–${Game.fmtMoney(a.cashMax)}, ✦ ${a.manaMin}–${a.manaMax}</div>
+        <button class="btn primary area-start" data-area="${a.id}">Start expedition</button>
+      </div>`).join('');
+    const trinkets = (G().trinkets || []).length
+      ? `<div class="trinket-box"><div class="col-title">Trinkets</div><div>${G().trinkets.map(() => '🔮').join(' ')}</div></div>`
+      : '';
+    return `<div class="you-hp">You have ${heartRow(Game.maxHp())}</div>${cards}${trinkets}`;
+  }
+  function bindAreaPicker(body) {
+    body.querySelectorAll('[data-area]').forEach(b => b.addEventListener('click', () => act(Game.startExpedition(b.dataset.area))));
   }
   function renderResearch() {
     el('researchBody').innerHTML = `<div class="tab-placeholder"><div class="tp-icon">⚗</div>
@@ -308,6 +412,7 @@ const UI = (() => {
     const re = el('rate');
     if (re) { if (rate >= 1) { re.style.display = 'block'; re.textContent = '+' + Game.fmtMoney(rate) + '/s'; } else re.style.display = 'none'; }
 
+    if (activeTab === 'combat') { updateCombatLive(); return; }
     if (activeTab !== 'home') return;
     G().planters.forEach((p, i) => {
       const fill = document.querySelector(`.row.planter[data-i="${i}"] .bar-fill`);
@@ -324,11 +429,24 @@ const UI = (() => {
       if (b.dataset.needslot) ok = ok && G().planters.some(p => !p.seed);
       b.classList.toggle('disabled', !ok);
     });
-    if (Game.ritualUnlocked()) {
-      const mana = Math.floor(G().mana), mmax = Game.manaMax();
-      const mf = el('manaFill'); if (mf) mf.style.width = (mana / mmax * 100) + '%';
-      const mn = el('manaNum'); if (mn) mn.textContent = mana + '/' + mmax;
-      const cb = el('castBtn'); if (cb) cb.classList.toggle('disabled', !Game.canCastRitual());
+    const cb = el('castBtn'); if (cb) cb.classList.toggle('disabled', !Game.canCastRitual());
+  }
+
+  function updateCombatLive() {
+    const c = Game.combat(); if (!c) return;
+    const fill = document.querySelector('.bar.combat .bar-fill');
+    if (fill) fill.style.width = Math.min(100, c.elapsed / c.duration * 100) + '%';
+    if (c.status === 'running') {
+      const pt = el('progTime'); if (pt) pt.textContent = Game.fmtTime((c.duration - c.elapsed) / Game.speed());
+      const hn = el('hpNow'); if (hn) hn.innerHTML = `<span class="hp-badge">❤ ${c.hp}</span>`;
+      const ln = document.querySelector('.run-foot .loot-now'); if (ln) ln.textContent = `${Game.fmtMoney(c.runCash)}, ✦ ${c.runMana}`;
+      // field-upgrade affordability
+      const pool = G().cents + c.runCash, mpool = G().mana + c.runMana;
+      document.querySelectorAll('[data-field]').forEach(b => {
+        const cost = Game.fieldCost(b.dataset.field);
+        const ok = cost.mana != null ? mpool >= cost.mana : pool >= cost.cash;
+        b.classList.toggle('cant', !ok);
+      });
     }
   }
 

@@ -106,9 +106,71 @@ const TABS = [
   { id: 'research', icon: '⚗', label: 'Research', needs: 'research' },
 ];
 
+/* ----- Combat / expeditions ----- */
+// Escalating cost sequence (in $, i.e. cents×100 handled where used).
+const COST_STEPS = [1, 1, 4, 5, 9, 11, 15];   // then continues ×~1.3
+
+// Field upgrades bought during a run.
+const FIELD_UPGRADES = [
+  { id: 'shield',   icon: '🛡', kind: 'shield', costMana: 10, minutes: 3, block: 0.5,
+    desc: '3-minute ward that blocks 50% of damage.' },
+  { id: 'hp',       icon: '❤', kind: 'hp',
+    desc: 'Permanently raises your maximum hearts.' },
+  { id: 'cashloot', icon: '$', kind: 'pct', stat: 'cash',
+    desc: 'Permanently increases cash loot by +1% each.' },
+  { id: 'manaloot', icon: '✦', kind: 'pct', stat: 'mana',
+    desc: 'Permanently increases mana loot by +1% each.' },
+];
+
+// Locations. cash values are in CENTS.
+const AREAS = [
+  {
+    id: 'wald', name: 'The Wald', icon: '🗺️',
+    riskMin: 5, riskMax: 14,
+    cashMin: 2300, cashMax: 5600,      // $23 – $56
+    manaMin: 10, manaMax: 25,
+    duration: 60,                       // game-seconds at ×1 (30s at ×2, …)
+    trinketChance: 0,                   // trinkets drop from the SECOND area (10%)
+    // A scary, ancient forest. dmg = hearts lost; cash in cents; mana points.
+    // Weights are tuned so ~1/3 of events wound — survivable near the low end
+    // of the risk range, comfortable once you upgrade hearts / raise a ward.
+    events: [
+      // — calm / boons (no damage) —
+      { name: 'quiet glade',    w: 12, dmg: 0 },
+      { name: 'birdsong',       w: 10, dmg: 0, mana: [0, 1] },
+      { name: 'ancient oak',    w:  9, dmg: 0, cash: [100, 300] },
+      { name: 'badger',         w:  9, dmg: 0, cash: [100, 300] },
+      { name: 'mushroom ring',  w:  8, dmg: 0, mana: [1, 2] },
+      { name: 'gamekeeper',     w:  7, dmg: 0, cash: [100, 400] },
+      { name: 'lost pilgrim',   w:  7, dmg: 0, cash: [100, 400] },
+      { name: 'old shrine',     w:  5, dmg: 0, cash: [200, 600] },
+      { name: 'will-o-wisp',    w:  5, dmg: 0, mana: [1, 2] },
+      // — wounds (−1 heart) —
+      { name: 'wolves',         w:  4, dmg: 1, cash: [100, 300] },
+      { name: 'raven',          w:  3, dmg: 1, cash: [200, 500] },
+      { name: 'stag',           w:  3, dmg: 1, mana: [0, 1] },
+      { name: 'spider web',     w:  3, dmg: 1, mana: [0, 1] },
+      { name: 'asp',            w:  3, dmg: 1 },
+      { name: 'hornet nest',    w:  3, dmg: 1 },
+      { name: 'bees',           w:  2, dmg: 1 },
+      { name: 'falling branch', w:  2, dmg: 1 },
+      { name: 'mudslide',       w:  2, dmg: 1 },
+      { name: 'deserter',       w:  2, dmg: 1, cash: [0, 200] },
+      { name: 'fugitive',       w:  2, dmg: 1, cash: [100, 300], mana: [0, 1] },
+      { name: 'cave dweller',   w:  2, dmg: 1, mana: [0, 1] },
+      // — rare —
+      { name: 'naiad',          w:  2, dmg: 1, cash: [1000, 2000], mana: [5, 10] }, // rare boon
+      { name: 'the horned one', w:  1, dmg: 2, cash: [500, 1200], mana: [2, 5] },   // rare, dangerous
+    ],
+  },
+];
+const AREAS_BY_ID = Object.fromEntries(AREAS.map(a => [a.id, a]));
+
 const CONFIG = {
   startCents: 10,
   ledgerRate: 0.04,              // 4% of average planted crop value per second
+  baseHp: 10,                   // starting maximum hearts
+  eventMin: 2, eventMax: 3,     // seconds between expedition events
 
   baseSlots: 1,
   offlineCapSeconds: 24 * 3600,  // cap offline progress at 24 hours
