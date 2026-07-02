@@ -56,9 +56,8 @@ const UI = (() => {
       s.combat ? s.combat.status + s.combat.log.length : 'nocombat',
       s.hpBought + '/' + s.cashLootBought + '/' + s.manaLootBought,
       buyMult, (s.trinkets || []).length,
-      // prestige (pending only forces rebuilds while its tab is open)
-      Game.prestigeUnlocked(), Game.prestigePoints(),
-      activeTab === 'prestige' ? Game.pendingPrestige() : 0,
+      // prestige / notebook cards (pending count is updated live, not here)
+      Game.prestigeUnlocked(), Game.prestigePoints(), Game.has('notebook'),
       // daily quests
       Game.dailyActive(), (s.questClaimed || []).join(''), s.hasPrestiged,
     ].join(';');
@@ -84,7 +83,7 @@ const UI = (() => {
        </button>`).join('');
   }
   function showView() {
-    ['home', 'notebook', 'combat', 'research', 'prestige'].forEach(v =>
+    ['home', 'combat', 'research'].forEach(v =>
       el('view-' + v).style.display = (v === activeTab ? 'block' : 'none'));
   }
 
@@ -259,31 +258,27 @@ const UI = (() => {
     if (sx) sx.addEventListener('click', () => { Game.clearRuneSeq(); act(true); });
   }
 
-  /* ---------- NOTEBOOK tab ---------- */
+  /* ---------- NOTEBOOK (home card) ---------- */
   function renderNotebook() {
-    const body = el('notebookBody');
-    const disc = (G().discovered || []);
-    if (!disc.length) {
-      body.innerHTML = `<p class="tab-intro">Perform a rite at the Ritual slate and it will be recorded here — then jot down what you think it does.</p>`;
-      return;
-    }
+    const card = el('notebookCard'), body = el('notebookBody');
+    if (!Game.has('notebook')) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
     const auto = Game.has('auto-ritual');
-    let html = `<p class="tab-intro">Rites you know. Write your own notes on what each one does.</p>`;
+    const disc = (G().discovered || []);
+    let html = `<p class="nb-intro">Personal notes on ritual sequences</p>`;
     html += disc.map(id => {
       const sp = Game.SPELLS_BY_ID[id];
       const pat = sp.seq.map(l => `<span class="mini-rune">${Game.RUNES_BY_ID[l].sym}</span>`).join('');
       const note = (G().notes && G().notes[id]) ? G().notes[id] : '';
       const on = G().autoCast && G().autoCast[id];
-      const autoBtn = auto ? `<button class="btn nb-auto ${on ? 'primary' : ''}" data-auto="${id}">${on ? 'Auto ✓' : 'Auto-cast'}</button>` : '';
+      const castBtn = auto ? `<button class="btn nb-cast ${on ? 'primary' : ''}" data-auto="${id}">${on ? 'Casting' : 'Cast'}</button>` : '';
       return `<div class="nb-spell">
-          <div class="nb-head"><div class="spell-pat">${pat}</div>
-            <div class="spell-info"><div class="spell-name">Unnamed rite <span class="spell-mana">${sp.mana}✦</span></div></div>
-            ${autoBtn}</div>
-          <textarea class="nb-notes" data-note="${id}" placeholder="What does it do?">${escapeHtml(note)}</textarea>
+          <div class="nb-head">${castBtn}<div class="spell-pat">${pat}</div><div class="nb-mana">✦ ${sp.mana}</div></div>
+          <textarea class="nb-notes" maxlength="255" data-note="${id}" placeholder="Your notes…">${escapeHtml(note)}</textarea>
         </div>`;
     }).join('');
     body.innerHTML = html;
-    body.querySelectorAll('[data-note]').forEach(t => t.addEventListener('input', () => { Game.setNote(t.dataset.note, t.value); Game.save(); }));
+    body.querySelectorAll('[data-note]').forEach(t => t.addEventListener('input', () => { Game.setNote(t.dataset.note, t.value.slice(0, 255)); Game.save(); }));
     body.querySelectorAll('[data-auto]').forEach(b => b.addEventListener('click', () => { Game.toggleAutoCast(b.dataset.auto); act(true); }));
   }
 
@@ -401,28 +396,25 @@ const UI = (() => {
         <p class="muted">Research nodes are being prepared — check back soon.</p></div>`;
   }
 
-  /* ---------- PRESTIGE ---------- */
+  /* ---------- PRESTIGE (home card) ---------- */
   function renderPrestige() {
-    const body = el('prestigeBody');
+    const card = el('prestigeCard'), body = el('prestigeBody');
+    if (!Game.prestigeUnlocked()) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
     const pts = Game.prestigePoints();
-    const pending = Game.pendingPrestige();
     const speed = Math.round(pts * Game.CONFIG.prestigeSpeedPer * 100);
     body.innerHTML = `
-      <p class="tab-intro">Offer everything to the cult and begin anew. You keep only your devotion.</p>
-      <div class="prestige-stat"><span>Prestige points</span><b>${pts}</b></div>
-      <div class="prestige-stat"><span>Plant speed bonus</span><b>+${speed}%</b></div>
-      <div class="prestige-stat"><span>Ready to claim now</span><b class="${pending > 0 ? 'good' : 'muted'}">+${pending}</b></div>
-      <div class="prestige-note">You earn <b>+1 point per $50</b> earned this run. Prestiging resets your money,
-      plants, upgrades, candles, mana and combat progress — but each point permanently adds
-      <b>+1% plant speed</b>.</div>
-      <button class="btn primary prestige-btn ${pending > 0 ? '' : 'disabled'}" id="prestigeBtn">
-        Prestige for +${pending} point${pending === 1 ? '' : 's'}</button>`;
+      <div class="prestige-stat"><span>Points</span><b>${pts}</b></div>
+      <div class="prestige-stat"><span>Plant speed</span><b>+${speed}%</b></div>
+      <div class="prestige-stat"><span>Ready to claim</span><b id="pPend" class="good">+${Game.pendingPrestige()}</b></div>
+      <div class="prestige-note">+1 point per $50 earned. Prestiging resets everything but points; each point = +1% plant speed.</div>
+      <button class="btn primary prestige-btn" id="prestigeBtn">Prestige</button>`;
     const b = el('prestigeBtn');
     if (b) b.addEventListener('click', () => {
       if (Game.pendingPrestige() < 1) return;
       if (!confirm(`Prestige now for +${Game.pendingPrestige()} points? You will lose everything except prestige points.`)) return;
       const r = Game.doPrestige();
-      if (r) { activeTab = 'home'; if (typeof confetti === 'function') confetti(); toast(`Reborn with <b>${r.total}</b> prestige points — +${Math.round(r.total * Game.CONFIG.prestigeSpeedPer * 100)}% plant speed.`); forceRebuild(); render(); }
+      if (r) { if (typeof confetti === 'function') confetti(); toast(`Reborn with <b>${r.total}</b> prestige points — +${Math.round(r.total * Game.CONFIG.prestigeSpeedPer * 100)}% plant speed.`); forceRebuild(); render(); }
     });
   }
 
@@ -432,11 +424,12 @@ const UI = (() => {
     const sig = structuralSig();
     if (sig !== lastSig) {
       renderTabs(); showView();
-      if (activeTab === 'home') { renderDaily(); renderBuy(); renderSeeds(); renderPlanters(); renderRitual(); }
-      else if (activeTab === 'notebook') renderNotebook();
+      if (activeTab === 'home') {
+        renderBuy(); renderPlanters(); renderPrestige(); renderDaily();
+        renderSeeds(); renderRitual(); renderNotebook();
+      }
       else if (activeTab === 'combat') renderCombat();
       else if (activeTab === 'research') renderResearch();
-      else if (activeTab === 'prestige') renderPrestige();
       lastSig = sig;
     }
     updateLive();
@@ -451,6 +444,12 @@ const UI = (() => {
 
     if (activeTab === 'combat') { updateCombatLive(); return; }
     if (activeTab !== 'home') return;
+    // prestige card live pending + button
+    if (Game.prestigeUnlocked()) {
+      const pend = Game.pendingPrestige();
+      const pp = el('pPend'); if (pp) pp.textContent = '+' + pend;
+      const pb = el('prestigeBtn'); if (pb) pb.classList.toggle('disabled', pend < 1);
+    }
     // daily quest live bits
     if (Game.dailyActive()) {
       const qt = el('qtimer'); if (qt) qt.textContent = 'Resets in ' + Game.fmtTime(Game.dailyTimeLeft());

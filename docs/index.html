@@ -11,7 +11,16 @@
 </head>
 <body>
   <div class="phone">
-    <!-- header -->
+    <!-- very top strip: clock left · speed + settings right -->
+    <div class="statusbar">
+      <span id="statusTime" class="sb-time">7:32</span>
+      <div class="sb-right">
+        <button id="speedBtn" class="mult-chip" title="Game speed — tap to change">×<span id="mult">1</span></button>
+        <button id="menuBtn" class="menu-btn" aria-label="settings">⚙</button>
+      </div>
+    </div>
+
+    <!-- header: tabs · money/mana/scrolls -->
     <header class="topbar">
       <nav id="tabbar" class="tabbar"></nav>
       <div class="hud">
@@ -19,11 +28,6 @@
         <span id="manaTop" class="mana-top">✦&nbsp;0</span>
         <span id="scrollsTop" class="scrolls-top">📜&nbsp;0</span>
         <span id="rate" class="rate"></span>
-      </div>
-      <div class="top-right">
-        <span class="game-title">Idle&nbsp;Cult</span>
-        <button id="speedBtn" class="mult-chip" title="Game speed — tap to change">×<span id="mult">1</span></button>
-        <button id="menuBtn" class="menu-btn" aria-label="settings">⚙</button>
       </div>
     </header>
 
@@ -36,39 +40,50 @@
     </div>
 
     <main class="content">
-      <!-- HOME (Grove) -->
+      <!-- HOME (Grove) — two-column dashboard -->
       <div id="view-home" class="view">
-        <section id="dailyCard" class="card daily" style="display:none">
-          <h2 class="card-title">Daily quest</h2>
-          <div id="dailyBody"></div>
-        </section>
+        <div class="dash">
+          <div class="col">
+            <section class="card">
+              <h2 class="card-title">Upgrades</h2>
+              <button id="buyUp" class="collapse-bar" aria-label="previous upgrades">⌃</button>
+              <div id="buyList" class="list"></div>
+              <button id="buyDown" class="collapse-bar" aria-label="next upgrades">⌄</button>
+            </section>
 
-        <section class="card">
-          <h2 class="card-title">Buy</h2>
-          <button id="buyUp" class="collapse-bar" aria-label="previous upgrades">⌃</button>
-          <div id="buyList" class="list"></div>
-          <button id="buyDown" class="collapse-bar" aria-label="next upgrades">⌄</button>
-        </section>
+            <section class="card">
+              <h2 class="card-title">Planters</h2>
+              <div id="planterList" class="list"></div>
+            </section>
 
-        <section class="card">
-          <h2 class="card-title">Seeds</h2>
-          <div id="seedList" class="list"></div>
-        </section>
+            <section id="prestigeCard" class="card" style="display:none">
+              <h2 class="card-title">Prestige</h2>
+              <div id="prestigeBody"></div>
+            </section>
 
-        <section class="card">
-          <h2 class="card-title">Planters</h2>
-          <div id="planterList" class="list"></div>
-        </section>
+            <section id="dailyCard" class="card daily" style="display:none">
+              <h2 class="card-title">Daily quest</h2>
+              <div id="dailyBody"></div>
+            </section>
+          </div>
 
-        <section id="ritualCard" class="card ritual locked">
-          <h2 class="card-title">Ritual slate</h2>
-          <div id="ritualBody" class="ritual-body"></div>
-        </section>
-      </div>
+          <div class="col">
+            <section class="card">
+              <h2 class="card-title">Seeds</h2>
+              <div id="seedList" class="list"></div>
+            </section>
 
-      <!-- NOTEBOOK -->
-      <div id="view-notebook" class="view" style="display:none">
-        <section class="card"><h2 class="card-title">Notebook</h2><div id="notebookBody"></div></section>
+            <section id="ritualCard" class="card ritual locked">
+              <h2 class="card-title">Ritual slate</h2>
+              <div id="ritualBody" class="ritual-body"></div>
+            </section>
+
+            <section id="notebookCard" class="card" style="display:none">
+              <h2 class="card-title">Notebook</h2>
+              <div id="notebookBody"></div>
+            </section>
+          </div>
+        </div>
       </div>
 
       <!-- COMBAT -->
@@ -79,11 +94,6 @@
       <!-- RESEARCH -->
       <div id="view-research" class="view" style="display:none">
         <section class="card"><h2 class="card-title">Research</h2><div id="researchBody"></div></section>
-      </div>
-
-      <!-- PRESTIGE -->
-      <div id="view-prestige" class="view" style="display:none">
-        <section class="card"><h2 class="card-title">Prestige</h2><div id="prestigeBody"></div></section>
       </div>
 
       <div class="footer">a small idle game · grow · sell · invoke</div>
