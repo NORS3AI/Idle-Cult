@@ -373,8 +373,18 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 .area-card { border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
 .loc-head { margin-bottom: 12px; }
 .loc-title { font-size: 20px; font-weight: 700; }
-.loc-sub { color: var(--muted); font-size: 14px; margin-top: 3px; }
-.area-start { margin-top: 12px; }
+.loc-flavor { color: #b9a98a; font-size: 13px; font-style: italic; margin: 2px 0 6px; }
+.loc-sub { color: var(--muted); font-size: 13px; margin-top: 3px; }
+.area-foot { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.visit-cost { color: var(--muted); font-size: 14px; }
+.area-foot .btn { margin-left: auto; }
+.area-start.disabled { opacity: .4; pointer-events: none; }
+/* trinket chips (activate one per location) */
+.tr-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tr-chip { background: var(--card-2); border: 1px solid var(--line); border-radius: 10px; color: var(--text); font-size: 12px; padding: 5px 9px; cursor: pointer; }
+.tr-chip.on { border-color: var(--accent); background: #221f16; color: var(--accent); }
+.tr-val { color: var(--good); font-weight: 700; }
+.blood-top { display: none; align-items: center; font-size: 15px; font-weight: 700; color: #d06a6a; white-space: nowrap; }
 
 .prog-head { display: flex; justify-content: space-between; align-items: center; font-size: 15px; font-weight: 600; margin: 6px 0; }
 .prog-right { display: flex; align-items: center; gap: 8px; color: var(--muted); font-weight: 500; }

@@ -145,49 +145,115 @@ const FIELD_UPGRADES = [
     desc: 'Permanently increases mana loot by +1% each.' },
 ];
 
-// Locations. cash values are in CENTS.
+/* Expedition locations. cash/visitCost in CENTS; blood/mana are counts.
+   `dmg` = hearts lost per wounding hit (event.d is a 0/1/2 multiplier).
+   `duration` = seconds at ×1 speed (÷512 at ×10 — "stupid fast but scaled").
+   `trinketChance` = drop chance on completion (0..1). */
+const _y = 31536000, _d = 86400;   // seconds in a year / day
 const AREAS = [
-  {
-    id: 'wald', name: 'The Wald', icon: '🗺️',
-    riskMin: 5, riskMax: 14,
-    cashMin: 2300, cashMax: 5600,      // $23 – $56
-    manaMin: 10, manaMax: 25,
-    duration: 60,                       // game-seconds at ×1 (30s at ×2, …)
-    trinketChance: 0,                   // trinkets drop from the SECOND area (10%)
-    // A scary, ancient forest. dmg = hearts lost; cash in cents; mana points.
-    // Weights are tuned so ~1/3 of events wound — survivable near the low end
-    // of the risk range, comfortable once you upgrade hearts / raise a ward.
+  { id: 'dulling', name: 'The Dulling', icon: '🌗',
+    flavor: 'The between of the light and the dark',
+    visitCost: _c(20), duration: 60,               /* ×10 ≈ 0.12s */
+    riskMin: 5, riskMax: 14, dmg: 1, trinketChance: 0,
+    cashMin: _c(23), cashMax: _c(56), manaMin: 10, manaMax: 25, bloodMin: 0, bloodMax: 0,
     events: [
-      // — calm / boons (no damage) —
-      { name: 'quiet glade',    w: 12, dmg: 0 },
-      { name: 'birdsong',       w: 10, dmg: 0, mana: [0, 1] },
-      { name: 'ancient oak',    w:  9, dmg: 0, cash: [100, 300] },
-      { name: 'badger',         w:  9, dmg: 0, cash: [100, 300] },
-      { name: 'mushroom ring',  w:  8, dmg: 0, mana: [1, 2] },
-      { name: 'gamekeeper',     w:  7, dmg: 0, cash: [100, 400] },
-      { name: 'lost pilgrim',   w:  7, dmg: 0, cash: [100, 400] },
-      { name: 'old shrine',     w:  5, dmg: 0, cash: [200, 600] },
-      { name: 'will-o-wisp',    w:  5, dmg: 0, mana: [1, 2] },
-      // — wounds (−1 heart) —
-      { name: 'wolves',         w:  4, dmg: 1, cash: [100, 300] },
-      { name: 'raven',          w:  3, dmg: 1, cash: [200, 500] },
-      { name: 'stag',           w:  3, dmg: 1, mana: [0, 1] },
-      { name: 'spider web',     w:  3, dmg: 1, mana: [0, 1] },
-      { name: 'asp',            w:  3, dmg: 1 },
-      { name: 'hornet nest',    w:  3, dmg: 1 },
-      { name: 'bees',           w:  2, dmg: 1 },
-      { name: 'falling branch', w:  2, dmg: 1 },
-      { name: 'mudslide',       w:  2, dmg: 1 },
-      { name: 'deserter',       w:  2, dmg: 1, cash: [0, 200] },
-      { name: 'fugitive',       w:  2, dmg: 1, cash: [100, 300], mana: [0, 1] },
-      { name: 'cave dweller',   w:  2, dmg: 1, mana: [0, 1] },
-      // — rare —
-      { name: 'naiad',          w:  2, dmg: 1, cash: [1000, 2000], mana: [5, 10] }, // rare boon
-      { name: 'the horned one', w:  1, dmg: 2, cash: [500, 1200], mana: [2, 5] },   // rare, dangerous
-    ],
-  },
+      { name: 'still dusk', w: 10, d: 0 }, { name: 'faint light', w: 9, d: 0 }, { name: 'moonbeam', w: 8, d: 0 },
+      { name: 'wandering soul', w: 7, d: 0 }, { name: 'ember moth', w: 6, d: 0 },
+      { name: 'deer', w: 4, d: 1 }, { name: 'elk', w: 4, d: 1 }, { name: 'bat', w: 4, d: 1 },
+      { name: 'hunter', w: 3, d: 1 }, { name: 'demon hunter', w: 3, d: 1 }, { name: 'fallen limb', w: 3, d: 1 },
+      { name: 'hidden trap', w: 3, d: 1 }, { name: 'creature of light', w: 2, d: 1 },
+      { name: 'creature of the dark', w: 1, d: 2 },
+    ] },
+  { id: 'blacktide', name: 'Blacktide Bay', icon: '🏴‍☠️',
+    flavor: 'A coastal hideout where contraband and pirates lay in hiding',
+    visitCost: _c(200), duration: 240,             /* ×10 ≈ 0.47s */
+    riskMin: 29, riskMax: 56, dmg: 6, trinketChance: 0.01,
+    cashMin: _c(281), cashMax: _c(521), manaMin: 59, manaMax: 149, bloodMin: 1, bloodMax: 2,
+    events: [
+      { name: 'calm tide', w: 9, d: 0 }, { name: 'gull cry', w: 8, d: 0 }, { name: 'buried chest', w: 7, d: 0 },
+      { name: 'tavern song', w: 6, d: 0 }, { name: 'deckhand', w: 5, d: 1 }, { name: 'cutthroat', w: 4, d: 1 },
+      { name: 'pirate', w: 4, d: 1 }, { name: 'harpooner', w: 3, d: 1 }, { name: 'sea serpent', w: 3, d: 1 },
+      { name: 'cannon fire', w: 3, d: 1 }, { name: 'riptide', w: 3, d: 1 }, { name: 'first mate', w: 2, d: 1 },
+      { name: 'the captain', w: 1, d: 2 },
+    ] },
+  { id: 'cathedral', name: "Mad Max's Cathedral", icon: '⛪',
+    flavor: 'A decrepit church filled with the dead and dust',
+    visitCost: _c(3000), duration: 3600,           /* ×10 ≈ 7s */
+    riskMin: 251, riskMax: 300, dmg: 40, trinketChance: 0.04,
+    cashMin: _c(4460), cashMax: _c(7520), manaMin: 507, manaMax: 689, bloodMin: 3, bloodMax: 15,
+    events: [
+      { name: 'dust motes', w: 8, d: 0 }, { name: 'stained glass', w: 7, d: 0 }, { name: 'old reliquary', w: 7, d: 0 },
+      { name: 'candlelight', w: 6, d: 0 }, { name: 'skeleton', w: 5, d: 1 }, { name: 'zombie', w: 5, d: 1 },
+      { name: 'crypt spider', w: 4, d: 1 }, { name: 'ghoul', w: 4, d: 1 }, { name: 'wight', w: 3, d: 1 },
+      { name: 'falling masonry', w: 3, d: 1 }, { name: 'vampire', w: 2, d: 1 }, { name: 'vampire lord', w: 1, d: 2 },
+    ] },
+  { id: 'windsor', name: 'Windsor Castle', icon: '🏰',
+    flavor: 'A fortress hiding a hidden darkness',
+    visitCost: _c(80000), duration: 16 * 3600,     /* 16h · ×10 ≈ 112s */
+    riskMin: 1920, riskMax: 2280, dmg: 300, trinketChance: 0.07,
+    cashMin: _c(120000), cashMax: _c(200000), manaMin: 7090, manaMax: 8880, bloodMin: 38, bloodMax: 71,
+    events: [
+      { name: 'empty hall', w: 8, d: 0 }, { name: 'tapestry', w: 7, d: 0 }, { name: 'treasury', w: 7, d: 0 },
+      { name: 'torchlight', w: 6, d: 0 }, { name: 'gremlin', w: 5, d: 1 }, { name: 'satyr', w: 5, d: 1 },
+      { name: 'gargoyle', w: 4, d: 1 }, { name: 'dark elf', w: 4, d: 1 }, { name: 'spike trap', w: 3, d: 1 },
+      { name: 'pit trap', w: 3, d: 1 }, { name: 'dark elf captain', w: 2, d: 1 }, { name: 'stone sentinel', w: 1, d: 2 },
+    ] },
+  { id: 'bright', name: 'The Bright Court', icon: '☀️',
+    flavor: 'The High Heavens on earth',
+    visitCost: _c(2e6), duration: 15 * _d,         /* 15d · ×10 ≈ 42m */
+    riskMin: 16300, riskMax: 18900, dmg: 2500, trinketChance: 0.11,
+    cashMin: _c(2.9e6), cashMax: _c(5.1e6), manaMin: 855, manaMax: 1260, bloodMin: 190, bloodMax: 255, // cash inferred
+    events: [
+      { name: 'sunshine', w: 9, d: 0 }, { name: 'gold hall', w: 7, d: 0 }, { name: 'choir', w: 7, d: 0 },
+      { name: 'blessing', w: 6, d: 0 }, { name: 'acolyte', w: 5, d: 1 }, { name: 'knight', w: 5, d: 1 },
+      { name: 'priest', w: 4, d: 1 }, { name: 'paladin', w: 4, d: 1 }, { name: 'holy trap', w: 3, d: 1 },
+      { name: 'radiant beam', w: 3, d: 1 }, { name: 'high paladin', w: 2, d: 1 }, { name: 'the archon', w: 1, d: 2 },
+    ] },
+  { id: 'forgotten', name: 'The Forgotten Court', icon: '🌲',
+    flavor: 'Where the forgotten things roam',
+    visitCost: _c(90e6), duration: 369 * _d,       /* 369d · ×10 ≈ 17h */
+    riskMin: 112000, riskMax: 125000, dmg: 17000, trinketChance: 0.17,
+    cashMin: _c(135e6), cashMax: _c(322e6), manaMin: 12500, manaMax: 18000, bloodMin: 533, bloodMax: 640,
+    events: [
+      { name: 'still stream', w: 8, d: 0 }, { name: 'quiet forest', w: 7, d: 0 }, { name: 'old cairn', w: 7, d: 0 },
+      { name: 'firefly', w: 6, d: 0 }, { name: 'wolf', w: 5, d: 1 }, { name: 'druid', w: 5, d: 1 },
+      { name: 'witch', w: 4, d: 1 }, { name: 'undead', w: 4, d: 1 }, { name: 'bramble snare', w: 3, d: 1 },
+      { name: 'dire wolf', w: 3, d: 1 }, { name: 'coven mother', w: 2, d: 1 }, { name: 'the forgotten one', w: 1, d: 2 },
+    ] },
+  { id: 'void', name: 'The Void', icon: '🌌',
+    flavor: "Nyl'Thraxil was born from the throat of a dying star",
+    visitCost: _c(130e12), duration: 30 * _y,      /* 30y · ×10 ≈ 21d */
+    riskMin: 5450000, riskMax: 9000000, dmg: 1e6, trinketChance: 0.29,
+    cashMin: _c(3e12), cashMax: _c(46e12), manaMin: 651e6, manaMax: 1.1e9, bloodMin: 65e6, bloodMax: 119e6, // cash < visit cost (as given)
+    bosses: ["Nyl'Thraxil", "Vyx'alith", "Dra'vah", "Mal'khorith", 'Cadence'],
+    events: [
+      { name: 'cold silence', w: 8, d: 0 }, { name: 'distant star', w: 7, d: 0 }, { name: 'stardust', w: 7, d: 0 },
+      { name: 'passing comet', w: 6, d: 0 }, { name: 'asteroid', w: 5, d: 1 }, { name: 'void spawn', w: 5, d: 1 },
+      { name: 'dying sun', w: 4, d: 1 }, { name: 'planet-eater', w: 4, d: 1 }, { name: 'gravity well', w: 3, d: 1 },
+      { name: 'void horror', w: 3, d: 1 }, { name: 'star leviathan', w: 2, d: 1 }, { name: '@boss', w: 1, d: 2 },
+    ] },
 ];
 const AREAS_BY_ID = Object.fromEntries(AREAS.map(a => [a.id, a]));
+
+/* Trinkets — 10 per location (Blacktide → Void). Found only in their location
+   and only work there. Each gives +value% to one stat; a duplicate draw adds +1%.
+   stats: cash / mana / blood loot %, luck (drop %), ward (block %), vigor (max HP %). */
+const _TR_NAMES = {
+  blacktide: ['Silver Dagger', 'Doubloon', 'Cutlass', 'Kraken Eye', 'Compass Rose', 'Powder Keg', 'Parrot Feather', 'Anchor Charm', 'Message Bottle', 'Jolly Roger'],
+  cathedral: ['Cracked Fang', 'Grave Dust', 'Rusted Nail', 'Tattered Shroud', 'Bone Rosary', 'Black Chalice', 'Cobweb Veil', 'Coffin Splinter', 'Ash Vial', 'Broken Halo'],
+  windsor: ['Gargoyle Talon', 'Satyr Horn', 'Gremlin Tooth', 'Dark Elf Ring', 'Cursed Brick', 'Shadow Sigil', 'Iron Key', 'Obsidian Shard', 'Wraith Lantern', 'Bat Wing'],
+  bright: ['Sun Medallion', 'Paladin Crest', "Priest's Censer", 'Golden Chalice', 'Halo Shard', 'Radiant Feather', 'Blessed Coin', 'Ivory Sword', 'Dawn Prism', 'Seraph Tear'],
+  forgotten: ['Witch Knot', 'Druid Acorn', 'Wolf Fang', 'Stream Pebble', 'Forgotten Locket', 'Bramble Crown', 'Moss Idol', 'Rune Bone', 'Ghost Ribbon', 'Elder Branch'],
+  void: ['Star Shard', 'Void Eye', 'Comet Tail', 'Asteroid Core', 'Nebula Dust', 'Black Hole Bead', 'Pulsar Sliver', "Nyl'Thraxil's Scale", 'Cosmic Ash', 'Dying Ember'],
+};
+const _TR_STATS = ['cash', 'mana', 'blood', 'luck', 'ward', 'vigor', 'cash', 'mana', 'blood', 'ward'];
+const _TR_LABEL = { cash: '$ loot', mana: 'mana loot', blood: 'blood loot', luck: 'trinket luck', ward: 'ward block', vigor: 'max hearts' };
+const _TR_BASE = { blacktide: 2, cathedral: 3, windsor: 4, bright: 5, forgotten: 6, void: 8 };
+const TRINKETS = [];
+for (const loc in _TR_NAMES) _TR_NAMES[loc].forEach((nm, i) => TRINKETS.push({ id: loc + '_' + i, loc, name: nm, stat: _TR_STATS[i], base: _TR_BASE[loc] }));
+const TRINKETS_BY_ID = Object.fromEntries(TRINKETS.map(t => [t.id, t]));
+const TRINKETS_BY_LOC = {};
+TRINKETS.forEach(t => { (TRINKETS_BY_LOC[t.loc] = TRINKETS_BY_LOC[t.loc] || []).push(t); });
 
 /* Daily quests — unlocked after the first prestige, reset every hour.
    Harvest plants to hit each tier, then Claim its scroll reward. */
@@ -235,6 +301,12 @@ const CONFIG = {
 
 /* Patch notes — newest first. Shown in Settings. */
 const PATCH_NOTES = [
+  { v: '1.4', title: 'Seven expeditions, trinkets & blood', items: [
+    'Seven themed locations: The Dulling, Blacktide Bay, Mad Max\'s Cathedral, Windsor Castle, The Bright Court, The Forgotten Court, The Void.',
+    'Each costs $ to enter and has its own risk, rewards, flavour and creatures. Higher speeds make runs "stupid fast" (÷512 at ×10).',
+    'New Blood resource and Trinkets — rare drops (locations 2-7) that only work where found; duplicates add +1%. Activate one per location.',
+    'Wider UI panels so nothing overlaps; blood shows in the top bar.',
+  ] },
   { v: '1.3', title: '22 crops & big-number scale', items: [
     'Full crop line from radish to Void Bloom (22 crops), scaling into the quadrillions and beyond.',
     'Numbers now use a k/m/b/t/Qa/Qi/No/De suffix scale; long grow times show in days and years.',

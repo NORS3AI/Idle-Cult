@@ -18,6 +18,13 @@ const Game = (() => {
     const val = (d / Math.pow(1000, i)).toFixed(2).replace(/\.?0+$/, '');
     return '$' + val + SUFFIXES[i];
   }
+  function fmtNum(n) {                                   // counts (mana, blood, scrolls)
+    n = Math.floor(n);
+    if (n < 1e6) return n.toLocaleString('en-US');
+    let i = Math.floor(Math.log10(n) / 3);
+    if (i >= SUFFIXES.length) i = SUFFIXES.length - 1;
+    return (n / Math.pow(1000, i)).toFixed(2).replace(/\.?0+$/, '') + SUFFIXES[i];
+  }
   function fmtTime(s) {
     s = Math.max(0, Math.ceil(s));
     if (s < 60) return s + 's';
@@ -223,7 +230,9 @@ const Game = (() => {
       notes: {},
       hpBought: 0, cashLootBought: 0, manaLootBought: 0,
       combat: null,
-      trinkets: [],
+      blood: 0,
+      trinkets: {},          // trinketId → value%
+      activeTrinket: {},     // areaId → trinketId
       prestigePoints: 0,
       prestigeUnlocked: false,
       hpBonus: 0,
@@ -320,12 +329,32 @@ const Game = (() => {
   function rnd(a, b) { return a + Math.random() * (b - a); }
   function irnd(a, b) { return Math.floor(rnd(a, b + 1)); }
 
+  /* ---- trinkets: bonus from the active trinket of a location, if its stat matches ---- */
+  function trinketBonus(areaId, stat) {
+    const id = (state.activeTrinket || {})[areaId];
+    if (!id) return 0;
+    const tr = TRINKETS_BY_ID[id];
+    if (!tr || tr.stat !== stat) return 0;
+    return (state.trinkets || {})[id] || 0;   // percent
+  }
+  function ownedTrinkets(areaId) {
+    return (TRINKETS_BY_LOC[areaId] || []).filter(t => (state.trinkets || {})[t.id] > 0);
+  }
+  function activateTrinket(areaId, id) {
+    if (!(state.trinkets || {})[id]) return;
+    state.activeTrinket = state.activeTrinket || {};
+    state.activeTrinket[areaId] = (state.activeTrinket[areaId] === id) ? null : id;  // toggle
+  }
+
   function startExpedition(areaId) {
     if (state.combat && state.combat.status === 'running') return false;
     const area = AREAS_BY_ID[areaId]; if (!area) return false;
+    if (state.cents < area.visitCost) return { noCash: true };
+    state.cents -= area.visitCost;
+    const vigor = trinketBonus(areaId, 'vigor');
     state.combat = {
       areaId, elapsed: 0, duration: area.duration,
-      hp: maxHp(), runCash: 0, runMana: 0, log: [],
+      hp: Math.round(maxHp() * (1 + vigor / 100)), runCash: 0, runMana: 0, runBlood: 0, log: [],
       nextEventAt: rnd(CONFIG.eventMin, CONFIG.eventMax),
       shieldRemaining: 0, status: 'running', paused: false,
     };
@@ -337,16 +366,19 @@ const Game = (() => {
     const total = area.events.reduce((s, e) => s + e.w, 0);
     let r = Math.random() * total, ev = area.events[0];
     for (const e of area.events) { if ((r -= e.w) <= 0) { ev = e; break; } }
-    let dmg = ev.dmg || 0;
+    let name = ev.name;
+    if (name === '@boss' && area.bosses) name = area.bosses[irnd(0, area.bosses.length - 1)];
+    let dmg = (ev.d || 0) * area.dmg;
     if (dmg && c.shieldRemaining > 0) {
-      const block = shieldTier().block;
-      let blocked = 0; for (let i = 0; i < dmg; i++) if (Math.random() < block) blocked++; dmg -= blocked;
+      const block = Math.min(0.95, shieldTier().block + trinketBonus(area.id, 'ward') / 100);
+      dmg = Math.round(dmg * (1 - block));
     }
-    const cash = ev.cash ? irnd(ev.cash[0], ev.cash[1]) : 0;
-    const mana = ev.mana ? irnd(ev.mana[0], ev.mana[1]) : 0;
+    // loot accrues each event, scaled to the location; totals clamp to the reward range on completion
+    const cash = Math.floor(Math.random() * area.cashMax / 8);
+    const mana = Math.floor(Math.random() * area.manaMax / 8);
     c.hp -= dmg; c.runCash += cash; c.runMana += mana;
-    c.log.push({ t: Math.round(c.elapsed), name: ev.name, dmg, cash, mana });
-    if (c.log.length > 60) c.log.shift();
+    c.log.push({ t: Math.round(c.elapsed), name, dmg, cash, mana });
+    if (c.log.length > 40) c.log.shift();
     if (c.hp <= 0) { c.hp = 0; c.status = 'dead'; }
   }
 
@@ -370,7 +402,11 @@ const Game = (() => {
     if (c.status === 'running' && c.elapsed >= c.duration) {
       c.elapsed = c.duration; c.status = 'complete';
       const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-      c.reward = { cash: clamp(c.runCash, area.cashMin, area.cashMax), mana: clamp(c.runMana, area.manaMin, area.manaMax) };
+      c.reward = {
+        cash: clamp(c.runCash, area.cashMin, area.cashMax),
+        mana: clamp(c.runMana, area.manaMin, area.manaMax),
+        blood: irnd(area.bloodMin, area.bloodMax),
+      };
     }
   }
 
@@ -407,23 +443,35 @@ const Game = (() => {
     return true;
   }
 
-  // Take the loot and end the run. mode: 'complete' (balanced reward) or 'flee' (what you have).
+  // Take the loot and end the run. 'complete' → full/balanced reward; else flee → what you gathered.
   function collectLoot() {
     const c = state.combat; if (!c || c.status === 'dead') return null;   // death = lose all loot
     const area = AREAS_BY_ID[c.areaId];
-    let cash, mana, complete = c.status === 'complete';
-    if (complete && c.reward) { cash = c.reward.cash; mana = c.reward.mana; }
-    else { cash = Math.min(c.runCash, area.cashMax); mana = Math.min(c.runMana, area.manaMax); }
-    cash = Math.round(cash * (1 + cashLootPct()));
-    mana = Math.round(mana * (1 + manaLootPct()));
-    earn(cash); state.mana += mana;
+    const complete = c.status === 'complete';
+    let cash, mana, blood;
+    if (complete && c.reward) { cash = c.reward.cash; mana = c.reward.mana; blood = c.reward.blood; }
+    else { cash = Math.min(c.runCash, area.cashMax); mana = Math.min(c.runMana, area.manaMax); blood = irnd(area.bloodMin, area.bloodMax); }
+    // bonuses: field-upgrade loot % + active trinket for this location
+    cash = Math.round(cash * (1 + cashLootPct() + trinketBonus(area.id, 'cash') / 100));
+    mana = Math.round(mana * (1 + manaLootPct() + trinketBonus(area.id, 'mana') / 100));
+    blood = Math.round(blood * (1 + trinketBonus(area.id, 'blood') / 100));
+    earn(cash); state.mana += mana; state.blood = (state.blood || 0) + blood;
+
+    // trinket drop (complete only) — chance boosted by the active "luck" trinket
     let trinket = null;
-    if (complete && area.trinketChance > 0 && Math.random() < area.trinketChance) {
-      trinket = { id: 't' + (state.trinkets.length + 1), area: area.id };
-      state.trinkets.push(trinket);
+    if (complete) {
+      const chance = area.trinketChance + trinketBonus(area.id, 'luck') / 100;
+      const pool = TRINKETS_BY_LOC[area.id] || [];
+      if (chance > 0 && pool.length && Math.random() < chance) {
+        const tr = pool[irnd(0, pool.length - 1)];
+        state.trinkets = state.trinkets || {};
+        const dup = state.trinkets[tr.id] > 0;
+        state.trinkets[tr.id] = dup ? state.trinkets[tr.id] + 1 : tr.base;   // dup → +1%
+        trinket = { name: tr.name, dup, value: state.trinkets[tr.id] };
+      }
     }
     state.combat = null;
-    return { cash, mana, trinket };
+    return { cash, mana, blood, trinket };
   }
   function dismissDeath() { if (state.combat && state.combat.status === 'dead') state.combat = null; }
 
@@ -514,8 +562,9 @@ const Game = (() => {
     if (!s.discovered.includes('rite_fdsa')) s.discovered.unshift('rite_fdsa');
     if (!Array.isArray(s.runeSeq)) s.runeSeq = [];
     if (!s.notes || typeof s.notes !== 'object') s.notes = {};
-    if (!Array.isArray(s.trinkets)) s.trinkets = [];
-    ['hasteStacks', 'runeSeqAt', 'hpBought', 'cashLootBought', 'manaLootBought', 'prestigePoints', 'hpBonus', 'scrolls', 'dailyHarvests', 'dailyResetAt']
+    if (!s.trinkets || typeof s.trinkets !== 'object' || Array.isArray(s.trinkets)) s.trinkets = {};
+    if (!s.activeTrinket || typeof s.activeTrinket !== 'object') s.activeTrinket = {};
+    ['hasteStacks', 'runeSeqAt', 'hpBought', 'cashLootBought', 'manaLootBought', 'prestigePoints', 'hpBonus', 'scrolls', 'dailyHarvests', 'dailyResetAt', 'blood']
       .forEach(k => { if (typeof s[k] !== 'number') s[k] = 0; });
     ['prestigeUnlocked', 'devMode', 'hasPrestiged'].forEach(k => { if (typeof s[k] !== 'boolean') s[k] = false; });
     if (!Array.isArray(s.questClaimed) || s.questClaimed.length !== DAILY_QUESTS.length) s.questClaimed = DAILY_QUESTS.map(() => false);
@@ -568,7 +617,7 @@ const Game = (() => {
   /* ---------- public API ---------- */
   return {
     get state() { return state; },
-    fmtMoney, fmtTime, now,
+    fmtMoney, fmtNum, fmtTime, now,
     multiplier, growthSpeed, effGrow, slotCount, speed, speedFactor, cycleSpeed,
     setDevMode, devMode, devGive,
     manaRegenPerSec, ritualManaCost, has, tabUnlocked, avgPlantedSell, ledgerPerSec, autoHarvest,
@@ -577,12 +626,14 @@ const Game = (() => {
     ritualUnlocked, candleCount, toggleCandle,
     allCandlesLit, runeShown, runeSeqStr, tapRune, clearRuneSeq, castSpellById,
     combat, startExpedition, togglePause, buyField, collectLoot, dismissDeath, shieldTier,
+    trinketBonus, ownedTrinkets, activateTrinket,
     prestigeUnlocked, pendingPrestige, prestigePoints, doPrestige,
     dailyActive, dailyTimeLeft, questProgress, questClaimable, claimQuest, allQuestsClaimed,
     plant, sell, replantSpot, toggleRepeat, buyItem, setNote,
     isGrown, progress, timeLeft,
     tick, applyOffline, save, load, reset, wipe,
     SEEDS, ITEMS, TABS, RUNES, SPELLS, AREAS, FIELD_UPGRADES, AREAS_BY_ID, PATCH_NOTES, DAILY_QUESTS,
+    TRINKETS, TRINKETS_BY_ID, TRINKETS_BY_LOC,
     SEEDS_BY_ID, ITEMS_BY_ID, RUNES_BY_ID, SPELLS_BY_ID, CONFIG,
   };
 })();
