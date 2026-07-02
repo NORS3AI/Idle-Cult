@@ -11,6 +11,7 @@ const UI = (() => {
   const MULTS = [1, 5, 10, 25];
   let lastSig = '';
   const flashState = {};           // planter index → last flashAt handled
+  const openInfo = {};             // shop item id → info tip expanded
   function riteVal(n) { return n === 1 ? '1' : (1 + (n - 1) / 10).toFixed(1); }  // 1, 1.1, 1.2, …
 
   const el = id => document.getElementById(id);
@@ -132,9 +133,11 @@ const UI = (() => {
     wrap.innerHTML = page.map(item => {
       const price = Game.itemPrice(item);
       const stockLabel = item.kind !== 'once' ? ` <span class="muted">(${Game.itemStockLeft(item)} left)</span>` : '';
-      const info = item.info ? ` <button class="info-btn" data-info="${item.id}" aria-label="info">ⓘ</button>` : '';
+      // every item gets an info button; tapping it expands the description inline
+      const info = ` <button class="info-btn ${openInfo[item.id] ? 'on' : ''}" data-info="${item.id}" aria-label="info" title="${item.desc}">ⓘ</button>`;
+      const tip = openInfo[item.id] ? `<div class="info-tip">${item.desc}</div>` : '';
       return `<div class="row">
-          <div class="row-main"><div class="row-title">${item.name}${info}${stockLabel}</div></div>
+          <div class="row-main"><div class="row-title">${item.name}${info}${stockLabel}</div>${tip}</div>
           <div class="row-price">${Game.fmtMoney(price)}</div>
           <button class="btn" data-buy="${item.id}" data-cost="${price}">Buy</button>
         </div>`;
@@ -142,7 +145,9 @@ const UI = (() => {
 
     wrap.querySelectorAll('[data-buy]').forEach(b => b.addEventListener('click', () => act(Game.buyItem(b.dataset.buy))));
     wrap.querySelectorAll('[data-info]').forEach(b => b.addEventListener('click', e => {
-      e.stopPropagation(); const it = Game.ITEMS_BY_ID[b.dataset.info]; toast(`<b>${it.name}</b> — ${it.desc}`);
+      e.stopPropagation(); e.preventDefault();
+      const id = b.dataset.info; openInfo[id] = !openInfo[id];
+      forceRebuild(); render();
     }));
   }
 

@@ -301,6 +301,9 @@ const CONFIG = {
 
 /* Patch notes — newest first. Shown in Settings. */
 const PATCH_NOTES = [
+  { v: '1.8', title: 'Upgrade info tips', items: [
+    'Every upgrade now has an ⓘ button that expands its description right under the item (tap again to close).',
+  ] },
   { v: '1.7', title: 'Auto-harvest toggle', items: [
     'Once you own the auto-harvester, a ⟳✦ checkbox in the Planters box turns it on/off. Unchecked = plant and sell by hand as normal.',
   ] },
