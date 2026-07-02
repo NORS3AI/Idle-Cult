@@ -3,16 +3,33 @@
    All money values are stored internally in CENTS (integers).
    ============================================================ */
 
+const _H = 3600;                       // seconds per hour
+const _c = d => Math.round(d * 100);   // dollars → cents (money is stored in cents)
+
 const SEEDS = [
-  // grow = seconds, sell/cost = cents, unlockAt = lifetime cents earned to reveal
-  { id: 'radish',     name: 'radish',     icon: '🥬', cost: 2,        grow: 6,      sell: 24,        unlockAt: 0 },
-  { id: 'cabbage',    name: 'cabbage',    icon: '🥦', cost: 10,       grow: 30,     sell: 120,       unlockAt: 222 },      // earn $2.22
-  { id: 'garlic',     name: 'garlic',     icon: '🧄', cost: 70,       grow: 120,    sell: 864,       unlockAt: 2700 },     // earn $27  (2 min)
-  { id: 'ginger',     name: 'ginger',     icon: '🫚', cost: 700,      grow: 2340,   sell: 8872,      unlockAt: 14000 },    // earn $140 (39 min)
-  { id: 'yarrow',     name: 'yarrow',     icon: '🌿', cost: 10000,    grow: 14400,  sell: 130000,    unlockAt: 50000 },    // earn $500 (4 h)
-  { id: 'mandrake',   name: 'mandrake',   icon: '🌱', cost: 160000,   grow: 43200,  sell: 2000000,   unlockAt: 150000 },   // earn $1.5k (12 h)
-  { id: 'wormwood',   name: 'wormwood',   icon: '🍂', cost: 3200000,  grow: 129600, sell: 40000000,  unlockAt: 500000 },   // earn $5k  (36 h)
-  { id: 'belladonna', name: 'belladonna', icon: '🫐', cost: 72000000, grow: 259200, sell: 900000000, unlockAt: 2000000 },  // earn $20k (72 h)
+  // grow = seconds, sell/cost/unlockAt = cents (via _c dollars). Times shown are at ×1 speed.
+  { id: 'radish',     name: 'radish',     icon: '🥬', cost: _c(0.02),  grow: 6,          sell: _c(0.24),  unlockAt: _c(0) },
+  { id: 'cabbage',    name: 'cabbage',    icon: '🥦', cost: _c(0.10),  grow: 30,         sell: _c(1.20),  unlockAt: _c(2.22) },
+  { id: 'garlic',     name: 'garlic',     icon: '🧄', cost: _c(0.70),  grow: 120,        sell: _c(8.64),  unlockAt: _c(27) },
+  { id: 'ginger',     name: 'ginger',     icon: '🫚', cost: _c(7),     grow: 2340,       sell: _c(88.72), unlockAt: _c(140) },
+  { id: 'yarrow',     name: 'yarrow',     icon: '🌿', cost: _c(333),   grow: 4 * _H,     sell: _c(1300),  unlockAt: _c(2000) },
+  { id: 'mandrake',   name: 'mandrake',   icon: '🌱', cost: _c(961),   grow: 9 * _H,     sell: _c(4700),  unlockAt: _c(25000) },
+  { id: 'wormwood',   name: 'wormwood',   icon: '🍂', cost: _c(1677),  grow: 20 * _H,    sell: _c(14482), unlockAt: _c(112000) },
+  { id: 'belladonna', name: 'belladonna', icon: '🫐', cost: _c(5900),  grow: 36 * _H,    sell: _c(29907), unlockAt: _c(347440) },
+  { id: 'pumpkin',    name: 'pumpkin',    icon: '🎃', cost: _c(12000), grow: 56 * _H,    sell: _c(78000), unlockAt: _c(743000) },
+  { id: 'wheat',      name: 'wheat',      icon: '🌾', cost: _c(72000), grow: 115 * _H,   sell: _c(256000),unlockAt: _c(4e6) },
+  { id: 'rye',        name: 'rye',        icon: '🥖', cost: _c(345000),grow: 290 * _H,   sell: _c(1e6),   unlockAt: _c(12.5e6) },
+  { id: 'carrot',     name: 'carrot',     icon: '🥕', cost: _c(1.2e6), grow: 559 * _H,   sell: _c(7.5e6), unlockAt: _c(65e6) },
+  { id: 'plum',       name: 'plum',       icon: '🍑', cost: _c(4e6),   grow: 1270 * _H,  sell: _c(22e6),  unlockAt: _c(390e6) },
+  { id: 'mango',      name: 'mango',      icon: '🥭', cost: _c(12e6),  grow: 1700 * _H,  sell: _c(109e6), unlockAt: _c(1.1e9) },
+  { id: 'tomato',     name: 'tomato',     icon: '🍅', cost: _c(77e6),  grow: 5200 * _H,  sell: _c(888e6), unlockAt: _c(119e9) },
+  { id: 'coconut',    name: 'coconut',    icon: '🥥', cost: _c(412e6), grow: 8489 * _H,  sell: _c(4e9),   unlockAt: _c(910e9) },
+  { id: 'banana',     name: 'banana',     icon: '🍌', cost: _c(1.7e12),grow: 14000 * _H, sell: _c(36e9),  unlockAt: _c(7e12) },
+  { id: 'apple',      name: 'apple',      icon: '🍎', cost: _c(16e12), grow: 29000 * _H, sell: _c(344e9), unlockAt: _c(199e12) },
+  { id: 'pear',       name: 'pear',       icon: '🍐', cost: _c(119e12),grow: 54000 * _H, sell: _c(4.4e12),unlockAt: _c(933e12) },
+  { id: 'raisin',     name: 'raisin',     icon: '🍇', cost: _c(1.1e15),grow: 119000 * _H,sell: _c(649e12),unlockAt: _c(500e15) },
+  { id: 'voidleaf',   name: 'void leaf',  icon: '🍃', cost: _c(833e15),grow: 777777 * _H,sell: _c(314e15),unlockAt: _c(999e18) },
+  { id: 'voidbloom',  name: 'void bloom', icon: '🌺', cost: _c(999e18),grow: 9e6 * _H,   sell: _c(999e24),unlockAt: _c(999e21) },
 ];
 
 const SEEDS_BY_ID = Object.fromEntries(SEEDS.map(s => [s.id, s]));
@@ -218,6 +235,10 @@ const CONFIG = {
 
 /* Patch notes — newest first. Shown in Settings. */
 const PATCH_NOTES = [
+  { v: '1.3', title: '22 crops & big-number scale', items: [
+    'Full crop line from radish to Void Bloom (22 crops), scaling into the quadrillions and beyond.',
+    'Numbers now use a k/m/b/t/Qa/Qi/No/De suffix scale; long grow times show in days and years.',
+  ] },
   { v: '1.2', title: 'Save fixes, rune tapping, Wipe Save', items: [
     'Refreshing no longer resets progress — saves (even old ones) always restore; corrupt saves are backed up, not lost.',
     'Fixed runes not being tappable (the ritual circle was intercepting taps).',
