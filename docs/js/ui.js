@@ -53,7 +53,7 @@ const UI = (() => {
       // combat
       s.combat ? s.combat.status + s.combat.log.length : 'nocombat',
       s.hpBought + '/' + s.cashLootBought + '/' + s.manaLootBought,
-      buyMult, (s.trinkets || []).length,
+      buyMult, Object.keys(s.trinkets || {}).length, JSON.stringify(s.activeTrinket || {}),
       // prestige / notebook cards (pending count is updated live, not here)
       Game.prestigeUnlocked(), Game.prestigePoints(), Game.has('notebook'),
       // daily quests
@@ -67,11 +67,14 @@ const UI = (() => {
     el('mult').textContent = Game.speed();
     el('speedBtn').classList.toggle('fast', Game.speed() > 1);
     const mt = el('manaTop');
-    mt.innerHTML = '✦&nbsp;' + Math.floor(G().mana);
+    mt.innerHTML = '✦&nbsp;' + Game.fmtNum(G().mana);
     mt.style.display = (Game.ritualUnlocked() || Game.has('auto-harvester') || G().mana > 0) ? 'inline-flex' : 'none';
     const sc = el('scrollsTop');
-    sc.innerHTML = '📜&nbsp;' + (G().scrolls || 0);
+    sc.innerHTML = '📜&nbsp;' + Game.fmtNum(G().scrolls || 0);
     sc.style.display = (G().hasPrestiged || (G().scrolls || 0) > 0) ? 'inline-flex' : 'none';
+    const bl = el('bloodTop');
+    bl.innerHTML = '🩸&nbsp;' + Game.fmtNum(G().blood || 0);
+    bl.style.display = (G().blood || 0) > 0 ? 'inline-flex' : 'none';
   }
   function renderTabs() {
     if (!Game.tabUnlocked(activeTab)) activeTab = 'home';
@@ -282,7 +285,7 @@ const UI = (() => {
   }
 
   /* ---------- COMBAT ---------- */
-  function heartRow(n) { return `<span class="hp-badge">❤ ${n}</span>`; }
+  function heartRow(n) { return `<span class="hp-badge">❤ ${Game.fmtNum(n)}</span>`; }
 
   function renderCombat() {
     const body = el('combatBody');
@@ -296,9 +299,9 @@ const UI = (() => {
     // event log (newest at the bottom)
     const logHtml = c.log.slice(-9).map(e => {
       const bits = [];
-      if (e.dmg) bits.push(`<span class="ev-hp">❤ -${e.dmg}</span>`);
+      if (e.dmg) bits.push(`<span class="ev-hp">❤ -${Game.fmtNum(e.dmg)}</span>`);
       if (e.cash) bits.push(`<span class="ev-cash">${Game.fmtMoney(e.cash)}</span>`);
-      if (e.mana) bits.push(`<span class="ev-mana">✦ ${e.mana}</span>`);
+      if (e.mana) bits.push(`<span class="ev-mana">✦ ${Game.fmtNum(e.mana)}</span>`);
       return `<div class="ev-row"><span class="ev-t">${Game.fmtTime(e.t)}</span><span class="ev-name">${e.name}</span><span class="ev-eff">${bits.join(', ')}</span></div>`;
     }).join('') || '<div class="ev-row muted"><span class="ev-name">The expedition begins…</span></div>';
 
@@ -321,13 +324,13 @@ const UI = (() => {
     let footer;
     if (running) {
       footer = `<div class="run-foot">
-          <div class="loot-now">${Game.fmtMoney(c.runCash)}, ✦ ${c.runMana}</div>
+          <div class="loot-now">${Game.fmtMoney(c.runCash)} · ✦ ${Game.fmtNum(c.runMana)}</div>
           <button class="btn" id="fleeBtn">Flee with loot</button>
         </div>`;
     } else if (c.status === 'complete') {
       footer = `<div class="run-foot done">
           <div class="foot-msg">✔ Expedition complete!</div>
-          <div class="loot-now">${Game.fmtMoney(c.reward.cash)}, ✦ ${c.reward.mana}</div>
+          <div class="loot-now">${Game.fmtMoney(c.reward.cash)} · ✦ ${Game.fmtNum(c.reward.mana)}${c.reward.blood ? ' · 🩸 ' + Game.fmtNum(c.reward.blood) : ''}</div>
           <button class="btn primary" id="collectBtn">Collect loot</button>
         </div>`;
     } else { // dead
@@ -337,11 +340,15 @@ const UI = (() => {
         </div>`;
     }
 
+    const rewardLine = `Reward: ${Game.fmtMoney(area.cashMin)}–${Game.fmtMoney(area.cashMax)} · ✦ ${Game.fmtNum(area.manaMin)}–${Game.fmtNum(area.manaMax)}`
+      + (area.bloodMax ? ` · 🩸 ${area.bloodMin}–${area.bloodMax}` : '')
+      + (area.trinketChance ? ` · 💎 ${Math.round(area.trinketChance * 100)}%` : '');
     body.innerHTML = `
       <div class="loc-head">
         <div class="loc-title">${area.icon} ${area.name}</div>
-        <div class="loc-sub">Risk: ❤ ${area.riskMin}–${area.riskMax}</div>
-        <div class="loc-sub">Reward: ${Game.fmtMoney(area.cashMin)}–${Game.fmtMoney(area.cashMax)}, ✦ ${area.manaMin}–${area.manaMax}</div>
+        <div class="loc-flavor">${area.flavor}</div>
+        <div class="loc-sub">Risk: ❤ ${Game.fmtNum(area.riskMin)}–${Game.fmtNum(area.riskMax)}</div>
+        <div class="loc-sub">${rewardLine}</div>
       </div>
       <div class="prog-head"><span>Progress</span>
         <span class="prog-right"><span id="progTime">${running ? Game.fmtTime((c.duration - c.elapsed) / Game.speed()) : ''}</span>
@@ -362,8 +369,8 @@ const UI = (() => {
     // handlers
     const on = (id, fn) => { const e = el(id); if (e) e.addEventListener('click', fn); };
     on('pauseBtn', () => { Game.togglePause(); act(true); });
-    on('fleeBtn', () => { const r = Game.collectLoot(); toast(`Fled with <b>${Game.fmtMoney(r.cash)}</b> &amp; <b>✦${r.mana}</b>.`); act(true); });
-    on('collectBtn', () => { const r = Game.collectLoot(); toast(`Collected <b>${Game.fmtMoney(r.cash)}</b> &amp; <b>✦${r.mana}</b>.${r.trinket ? ' A trinket dropped!' : ''}`); act(true); });
+    on('fleeBtn', () => { const r = Game.collectLoot(); toast(lootMsg('Fled with', r)); act(true); });
+    on('collectBtn', () => { const r = Game.collectLoot(); toast(lootMsg('Collected', r)); act(true); });
     on('dieBtn', () => { Game.dismissDeath(); act(true); });
     body.querySelectorAll('[data-field]').forEach(b => b.addEventListener('click', () => act(Game.buyField(b.dataset.field, buyMult))));
     body.querySelectorAll('[data-mult]').forEach(b => b.addEventListener('click', () => {
@@ -373,21 +380,53 @@ const UI = (() => {
     }));
   }
 
+  function lootMsg(verb, r) {
+    if (!r) return '';
+    let s = `${verb} <b>${Game.fmtMoney(r.cash)}</b> · <b>✦${Game.fmtNum(r.mana)}</b>`;
+    if (r.blood) s += ` · <b>🩸${Game.fmtNum(r.blood)}</b>`;
+    if (r.trinket) s += ` — <b>${r.trinket.name}</b> ${r.trinket.dup ? '+1% (now ' + r.trinket.value + '%)' : 'found!'}`;
+    return s;
+  }
+
   function renderAreaPicker() {
-    let cards = Game.AREAS.map(a => `
-      <div class="area-card">
-        <div class="loc-title">${a.icon} ${a.name}</div>
-        <div class="loc-sub">Risk: ❤ ${a.riskMin}–${a.riskMax}</div>
-        <div class="loc-sub">Reward: ${Game.fmtMoney(a.cashMin)}–${Game.fmtMoney(a.cashMax)}, ✦ ${a.manaMin}–${a.manaMax}</div>
-        <button class="btn primary area-start" data-area="${a.id}">Start expedition</button>
-      </div>`).join('');
-    const trinkets = (G().trinkets || []).length
-      ? `<div class="trinket-box"><div class="col-title">Trinkets</div><div>${G().trinkets.map(() => '🔮').join(' ')}</div></div>`
-      : '';
-    return `<div class="you-hp">You have ${heartRow(Game.maxHp())}</div>${cards}${trinkets}`;
+    const cards = Game.AREAS.map(a => {
+      const rewardLine = `${Game.fmtMoney(a.cashMin)}–${Game.fmtMoney(a.cashMax)} · ✦${Game.fmtNum(a.manaMin)}–${Game.fmtNum(a.manaMax)}`
+        + (a.bloodMax ? ` · 🩸${a.bloodMin}–${a.bloodMax}` : '')
+        + (a.trinketChance ? ` · 💎${Math.round(a.trinketChance * 100)}%` : '');
+      // owned trinkets for this location → activate one
+      const owned = Game.ownedTrinkets(a.id);
+      let trinketRow = '';
+      if (owned.length) {
+        trinketRow = `<div class="tr-row">${owned.map(t => {
+          const on = (G().activeTrinket || {})[a.id] === t.id;
+          const val = G().trinkets[t.id];
+          return `<button class="tr-chip ${on ? 'on' : ''}" data-trin="${a.id}::${t.id}" title="+${val}% ${Game.fmtMoney ? '' : ''}${t.stat}">${t.name} <span class="tr-val">+${val}%</span></button>`;
+        }).join('')}</div>`;
+      }
+      return `<div class="area-card">
+          <div class="loc-title">${a.icon} ${a.name}</div>
+          <div class="loc-flavor">${a.flavor}</div>
+          <div class="loc-sub">Risk: ❤ ${Game.fmtNum(a.riskMin)}–${Game.fmtNum(a.riskMax)}</div>
+          <div class="loc-sub">Reward: ${rewardLine}</div>
+          ${trinketRow}
+          <div class="area-foot">
+            <span class="visit-cost">Visit: ${Game.fmtMoney(a.visitCost)}</span>
+            <button class="btn primary area-start" data-area="${a.id}" data-cost="${a.visitCost}">Enter</button>
+          </div>
+        </div>`;
+    }).join('');
+    return `<div class="you-hp">You have ${heartRow(Game.maxHp())}</div>${cards}`;
   }
   function bindAreaPicker(body) {
-    body.querySelectorAll('[data-area]').forEach(b => b.addEventListener('click', () => act(Game.startExpedition(b.dataset.area))));
+    body.querySelectorAll('[data-area]').forEach(b => b.addEventListener('click', () => {
+      const r = Game.startExpedition(b.dataset.area);
+      if (r && r.noCash) { toast('Not enough $ to visit.'); return; }
+      act(true);
+    }));
+    body.querySelectorAll('[data-trin]').forEach(b => b.addEventListener('click', () => {
+      const [loc, id] = b.dataset.trin.split('::');
+      Game.activateTrinket(loc, id); act(true);
+    }));
   }
   function renderResearch() {
     el('researchBody').innerHTML = `<div class="tab-placeholder"><div class="tp-icon">⚗</div>
@@ -489,14 +528,17 @@ const UI = (() => {
   }
 
   function updateCombatLive() {
-    const c = Game.combat(); if (!c) return;
+    const c = Game.combat();
+    if (!c) {   // area picker — grey out locations you can't afford to visit
+      document.querySelectorAll('[data-area]').forEach(b => b.classList.toggle('disabled', G().cents < +b.dataset.cost));
+      return;
+    }
     const fill = document.querySelector('.bar.combat .bar-fill');
     if (fill) fill.style.width = Math.min(100, c.elapsed / c.duration * 100) + '%';
     if (c.status === 'running') {
-      const pt = el('progTime'); if (pt) pt.textContent = Game.fmtTime((c.duration - c.elapsed) / Game.speed());
-      const hn = el('hpNow'); if (hn) hn.innerHTML = `<span class="hp-badge">❤ ${c.hp}</span>`;
-      const ln = document.querySelector('.run-foot .loot-now'); if (ln) ln.textContent = `${Game.fmtMoney(c.runCash)}, ✦ ${c.runMana}`;
-      // field-upgrade affordability
+      const pt = el('progTime'); if (pt) pt.textContent = Game.fmtTime((c.duration - c.elapsed) / Game.speedFactor());
+      const hn = el('hpNow'); if (hn) hn.innerHTML = `<span class="hp-badge">❤ ${Game.fmtNum(c.hp)}</span>`;
+      const ln = document.querySelector('.run-foot .loot-now'); if (ln) ln.textContent = `${Game.fmtMoney(c.runCash)} · ✦ ${Game.fmtNum(c.runMana)}`;
       const pool = G().cents + c.runCash, mpool = G().mana + c.runMana;
       document.querySelectorAll('[data-field]').forEach(b => {
         const cost = Game.fieldCost(b.dataset.field);
