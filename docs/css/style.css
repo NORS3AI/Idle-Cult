@@ -33,7 +33,7 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 
 .phone {
   width: 100%;
-  max-width: 460px;
+  max-width: 960px;             /* wide on desktop/tablet; 100% on mobile */
   background: var(--bg);
   min-height: 100vh;
   position: relative;
@@ -131,13 +131,12 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 .nb-notes:focus { outline: none; border-color: var(--accent); }
 
 /* ---------- home dashboard (two columns) ---------- */
-.dash { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
-.dash .col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* single column on phones (no cramping/overlap), two wide columns on tablet+ */
+.dash { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+.dash .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .dash .card { margin-bottom: 0; }
-@media (max-width: 560px) {
-  .dash { gap: 10px; }
-  .dash .card { padding: 12px; }
-  .card-title { font-size: 18px; }
+@media (min-width: 720px) {
+  .dash { grid-template-columns: 1fr 1fr; }
 }
 
 /* ---------- cards ---------- */
@@ -413,9 +412,9 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 .run-foot.dead .btn, .run-foot.dead { }
 .trinket-box { margin-top: 14px; font-size: 22px; }
 
-@media (max-width: 420px) {
+@media (max-width: 719px) {
   .combat-cols { flex-direction: column; }
-  .event-log { height: 150px; }
+  .event-log { height: 170px; }
 }
 
 /* ---------- daily quests ---------- */

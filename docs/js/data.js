@@ -24,11 +24,11 @@ const SEEDS = [
   { id: 'mango',      name: 'mango',      icon: '🥭', cost: _c(12e6),  grow: 1700 * _H,  sell: _c(109e6), unlockAt: _c(1.1e9) },
   { id: 'tomato',     name: 'tomato',     icon: '🍅', cost: _c(77e6),  grow: 5200 * _H,  sell: _c(888e6), unlockAt: _c(119e9) },
   { id: 'coconut',    name: 'coconut',    icon: '🥥', cost: _c(412e6), grow: 8489 * _H,  sell: _c(4e9),   unlockAt: _c(910e9) },
-  { id: 'banana',     name: 'banana',     icon: '🍌', cost: _c(1.7e12),grow: 14000 * _H, sell: _c(36e9),  unlockAt: _c(7e12) },
-  { id: 'apple',      name: 'apple',      icon: '🍎', cost: _c(16e12), grow: 29000 * _H, sell: _c(344e9), unlockAt: _c(199e12) },
-  { id: 'pear',       name: 'pear',       icon: '🍐', cost: _c(119e12),grow: 54000 * _H, sell: _c(4.4e12),unlockAt: _c(933e12) },
-  { id: 'raisin',     name: 'raisin',     icon: '🍇', cost: _c(1.1e15),grow: 119000 * _H,sell: _c(649e12),unlockAt: _c(500e15) },
-  { id: 'voidleaf',   name: 'void leaf',  icon: '🍃', cost: _c(833e15),grow: 777777 * _H,sell: _c(314e15),unlockAt: _c(999e18) },
+  { id: 'banana',     name: 'banana',     icon: '🍌', cost: _c(3.6e9), grow: 14000 * _H, sell: _c(36e9),  unlockAt: _c(7e12) },
+  { id: 'apple',      name: 'apple',      icon: '🍎', cost: _c(34.4e9),grow: 29000 * _H, sell: _c(344e9), unlockAt: _c(199e12) },
+  { id: 'pear',       name: 'pear',       icon: '🍐', cost: _c(440e9), grow: 54000 * _H, sell: _c(4.4e12),unlockAt: _c(933e12) },
+  { id: 'raisin',     name: 'raisin',     icon: '🍇', cost: _c(64.9e12),grow: 119000 * _H,sell: _c(649e12),unlockAt: _c(500e15) },
+  { id: 'voidleaf',   name: 'void leaf',  icon: '🍃', cost: _c(31.4e15),grow: 777777 * _H,sell: _c(314e15),unlockAt: _c(999e18) },
   { id: 'voidbloom',  name: 'void bloom', icon: '🌺', cost: _c(999e18),grow: 9e6 * _H,   sell: _c(999e24),unlockAt: _c(999e21) },
 ];
 
@@ -124,7 +124,7 @@ const SPELLS_BY_ID = Object.fromEntries(SPELLS.map(s => [s.id, s]));
 // Top tabs are only Grove / Combat / Research. Notebook, Prestige and Daily
 // Quests live as cards on the Grove dashboard.
 const TABS = [
-  { id: 'home',     icon: '⌂', label: 'Grove',    needs: null },
+  { id: 'home',     icon: '🏠', label: 'Grove',    needs: null },
   { id: 'combat',   icon: '⚔', label: 'Combat',   needs: 'map' },
   { id: 'research', icon: '⚗', label: 'Research', needs: 'research' },
 ];
