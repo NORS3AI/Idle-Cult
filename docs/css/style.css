@@ -446,7 +446,11 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 .ev-t { color: var(--muted); min-width: 34px; }
 .ev-name { flex: 1; }
 .ev-eff { display: flex; gap: 6px; white-space: nowrap; }
-.ev-hp { color: #e0607a; } .ev-cash { color: #cbb98a; } .ev-mana { color: #7db0e8; }
+.ev-hp { color: #e0607a; } .ev-cash { color: #cbb98a; } .ev-mana { color: #7db0e8; } .ev-blood { color: #e0607a; }
+/* the boss finale stands out in the log */
+.ev-row.boss { background: rgba(231, 196, 107, 0.10); border-radius: 6px; padding: 5px 6px; margin: 2px -6px; }
+.ev-row.boss .ev-name { color: var(--gold, #e7c46b); font-weight: 700; }
+.ev-row.boss .ev-cash { color: #7fb069; } .ev-row.boss .ev-mana { color: #7db0e8; }
 
 .mult-step { display: inline-flex; align-items: center; gap: 6px; text-transform: none; }
 .mult-step button { width: 24px; height: 24px; border-radius: 6px; background: var(--card-2); border: 1px solid var(--line); color: var(--text); cursor: pointer; }
