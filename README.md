@@ -37,7 +37,14 @@ Icons at the top switch between areas, unlocking as you buy the matching item:
 
 - **Grove** (home) — planters, seeds, shop and the Ritual slate.
 - **Notebook** — every rite you know, with an editable notes box for each.
-- **Combat** — opened by the **map** (combat content in progress).
+- **Combat** — opened by the **map**. Send an expedition into **The Wald** (a
+  scary ancient forest): a progress bar fills over ~1 min (faster at higher game
+  speed) while a themed **Event Log** ticks every 2–3s. Events can cost hearts or
+  grant `$`/mana. Spend on **Field upgrades** mid-run — a 3-min ward (50% block,
+  10 mana), `+HP`, `+1% $ loot`, `+1% mana loot`. **Flee with loot** anytime with
+  no penalty; if your hearts hit 0 you **die and lose the run's loot**. Each run
+  pays out within the location's reward range. (Trinket drops from the 2nd area
+  are wired up, pending its art/stats.)
 - **Research** — opened by **research / the alembic** (research nodes in progress).
 
 Progress **auto-saves to the browser** and keeps running while the tab/app is
