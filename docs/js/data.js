@@ -62,7 +62,7 @@ const ITEMS = [
   },
   {
     id: 'ledger', name: 'ledger', kind: 'once', base: 33300, info: true,
-    desc: 'Generates a steady $0.40 per second.',
+    desc: 'Generates a steady $0.04 per second.',
   },
   {
     id: 'grafting-kit', name: 'grafting kit', kind: 'once', base: 80000,
@@ -266,7 +266,7 @@ const DAILY_QUESTS = [
 
 const CONFIG = {
   startCents: 10,
-  ledgerFlat: 40,               // ledger passive income: $0.40/s (40 cents)
+  ledgerFlat: 4,                // ledger passive income: $0.04/s (4 cents)
   baseHp: 10,                   // starting maximum hearts
   eventMin: 2, eventMax: 3,     // seconds between expedition events
   autoHarvestMana: 1,           // mana per crop (harvest + replant) for the auto-harvester
@@ -274,7 +274,8 @@ const CONFIG = {
   compassSpeed: 1.5,            // expeditions run 50% faster
   poulticeHealEvery: 6,         // seconds between +1 heart in combat
   prestigeUnlockEarned: 200000, // $2,000 lifetime opens Prestige
-  prestigePer: 5000,            // +1 prestige point per $50 earned
+  prestigeBase: 5000,           // first prestige point costs $50 (cents)…
+  prestigeGrowth: 1.1,          // …then +10% per point
   prestigeSpeedPer: 0.01,       // +1% plant speed per prestige point
   // combat ward tiers: base → brazier → ironwood
   shieldTiers: {
@@ -301,6 +302,12 @@ const CONFIG = {
 
 /* Patch notes — newest first. Shown in Settings. */
 const PATCH_NOTES = [
+  { v: '1.9', title: 'Prestige & mana tuning', items: [
+    'Prestige points now cost $50 for the first, then +10% each (shown as "next point costs").',
+    'Mana no longer trickles up on its own — it only comes from combat or the dev panel.',
+    'Ledger income reduced to $0.04/s.',
+    'Top bar no longer jitters left/right as your cash changes.',
+  ] },
   { v: '1.8', title: 'Upgrade info tips', items: [
     'Every upgrade now has an ⓘ button that expands its description right under the item (tap again to close).',
   ] },

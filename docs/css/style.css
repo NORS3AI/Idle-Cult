@@ -57,8 +57,12 @@ body { display: flex; justify-content: center; min-height: 100vh; }
   background: var(--bg); border-bottom: 1px solid var(--line);
   overflow-x: auto;
 }
-.money { font-size: 20px; font-weight: 700; letter-spacing: .3px; white-space: nowrap; }
-.hud { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.money {
+  font-size: 20px; font-weight: 700; letter-spacing: .3px; white-space: nowrap;
+  min-width: 116px;                       /* fixed slot so the row doesn't jitter as $ changes */
+  font-variant-numeric: tabular-nums;
+}
+.hud { display: flex; align-items: center; gap: 10px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .scrolls-top { display: none; align-items: center; font-size: 15px; font-weight: 700; color: #d8c79a; white-space: nowrap; }
 .rate { display: none; font-size: 11px; color: var(--good); font-weight: 600; }
 .game-title { font-family: Georgia, "Times New Roman", serif; font-size: 15px; color: var(--muted); white-space: nowrap; }
