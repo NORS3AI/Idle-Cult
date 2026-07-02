@@ -53,6 +53,7 @@ const UI = (() => {
       Game.runeSeqStr(),
       (s.discovered || []).join(','),
       s.planters.map(p => (p.seed || ('_' + (p.lastSeed || ''))) + (p.repeat ? 'R' : '') + (p.riteCount || 0)).join('|'),
+      Game.autoHarvestOn(),
       // combat
       s.combat ? s.combat.status + s.combat.log.length : 'nocombat',
       s.hpBought + '/' + s.cashLootBought + '/' + s.manaLootBought,
@@ -178,6 +179,11 @@ const UI = (() => {
   function renderPlanters() {
     const wrap = el('planterList');
     let html = '';
+    if (Game.has('auto-harvester')) {
+      const on = Game.autoHarvestOn();
+      html += `<label class="auto-toggle"><input type="checkbox" id="autoHarvChk" ${on ? 'checked' : ''}/>
+          <span class="ah-icons">⟳ ✦</span><span class="ah-label">Auto-harvest</span></label>`;
+    }
     G().planters.forEach((p, i) => {
       const rep = `<button class="btn icon-btn repeat ${p.repeat ? 'on' : ''}" data-repeat="${i}" title="Save this spot — keep replanting this crop">⟳</button>`;
       if (p.seed) {
@@ -211,6 +217,7 @@ const UI = (() => {
     wrap.querySelectorAll('[data-sell]').forEach(b => b.addEventListener('click', () => act(Game.sell(+b.dataset.sell))));
     wrap.querySelectorAll('[data-replant]').forEach(b => b.addEventListener('click', () => act(Game.replantSpot(+b.dataset.replant))));
     wrap.querySelectorAll('[data-repeat]').forEach(b => b.addEventListener('click', () => { Game.toggleRepeat(+b.dataset.repeat); act(true); }));
+    const ah = el('autoHarvChk'); if (ah) ah.addEventListener('change', () => { Game.toggleAutoHarvest(); act(true); });
   }
 
   /* ---------- RITUAL SLATE ---------- */
