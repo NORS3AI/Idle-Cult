@@ -6,7 +6,6 @@
 
 const UI = (() => {
   let buyPage = 0;
-  let selectedCandle = null;
   let activeTab = 'home';
   let buyMult = 1;                 // field-upgrade buy quantity (× stepper)
   const MULTS = [1, 5, 10, 25];
@@ -25,7 +24,7 @@ const UI = (() => {
     el('tabbar').addEventListener('click', e => {
       const b = e.target.closest('[data-tab]');
       if (!b || !Game.tabUnlocked(b.dataset.tab)) return;
-      activeTab = b.dataset.tab; selectedCandle = null; Game.save(); forceRebuild(); render();
+      activeTab = b.dataset.tab; Game.save(); forceRebuild(); render();
       window.scrollTo({ top: 0 });
     });
   }
@@ -43,14 +42,15 @@ const UI = (() => {
   function structuralSig() {
     const s = G();
     return [
-      activeTab, buyPage, selectedCandle,
+      activeTab, buyPage,
       s.planters.length,
       s.unlockedSeeds.join(','),
       JSON.stringify(s.items),
       Game.ritualUnlocked(),
-      s.candles.map(c => (c.lit ? 'L' : 'd') + c.rune[0]).join(''),
-      Game.ritualReady(),
+      s.candles.slice(0, 4).map(c => c.lit ? 'L' : 'd').join(''),
+      Game.runeSeqStr(),
       (s.discovered || []).join(','),
+      JSON.stringify(s.autoCast || {}),
       s.planters.map(p => (p.seed || ('_' + (p.lastSeed || ''))) + (p.repeat ? 'R' : '')).join('|'),
       // combat
       s.combat ? s.combat.status + s.combat.log.length : 'nocombat',
@@ -223,60 +223,40 @@ const UI = (() => {
     const count = Game.candleCount();
     const corners = ['tl', 'tr', 'bl', 'br'];
     let cornersHtml = '';
-    G().candles.forEach((c, i) => {
-      if (i >= count) { cornersHtml += `<div class="corner ${corners[i]} holder"><span class="holder-dot">·</span></div>`; return; }
-      const rune = Game.RUNES_BY_ID[c.rune];
-      cornersHtml += `<div class="corner ${corners[i]} candle ${c.lit ? 'lit' : ''} ${selectedCandle === i ? 'sel' : ''}" data-candle="${i}">
-          <div class="flame"></div><div class="candle-body"></div>
-          <div class="rune ${c.lit ? '' : 'dim'}">${rune.sym}</div>
-        </div>`;
-    });
-
-    let center;
-    if (count < Game.CONFIG.candleCount) {
-      const n = Game.CONFIG.candleCount - count;
-      center = `<div class="slate-center hint">Set ${n} more candle${n > 1 ? 's' : ''} from the shop.</div>`;
-    } else if (Game.ritualReady()) {
-      const ok = Game.canCastRitual();
-      center = `<div class="slate-center matched">
-          <div class="cast-name">a rite stirs…</div>
-          <button class="btn primary cast-btn ${ok ? '' : 'disabled'}" id="castBtn">Cast · ${Game.ritualManaCost()}✦</button>
-        </div>`;
-    } else {
-      center = `<div class="slate-center hint">Light all four candles — <b>one of each rune</b>.</div>`;
+    for (let i = 0; i < Game.CONFIG.candleCount; i++) {
+      if (i >= count) { cornersHtml += `<div class="corner ${corners[i]} holder"><span class="holder-dot">·</span></div>`; continue; }
+      const c = G().candles[i];
+      cornersHtml += `<div class="corner ${corners[i]} candle ${c.lit ? 'lit' : ''}" data-candle="${i}">
+          <div class="flame"></div><div class="candle-body"></div></div>`;
     }
 
-    let picker = '';
-    if (selectedCandle != null && selectedCandle < count) {
-      const cur = G().candles[selectedCandle];
-      picker = `<div class="rune-picker">
-        ${Game.RUNES.map(r => `<button class="rune-opt ${cur.rune === r.id && cur.lit ? 'active' : ''}" data-setrune="${r.id}" title="${r.name}">${r.sym}</button>`).join('')}
-        <button class="rune-opt snuff" data-snuff="1" title="Snuff candle">✕</button>
-      </div>`;
+    const lit = Game.allCandlesLit();
+    let runesHtml = '';
+    if (lit) runesHtml = Game.RUNES.map(r =>
+      `<button class="slate-rune pos-${r.pos}" data-rune="${r.id}" title="${r.letter}">${r.sym}</button>`).join('');
+
+    const seq = Game.runeSeqStr();
+    let seqHtml = '';
+    if (lit && seq.length) {
+      seqHtml = `<div class="rune-seq">${seq.split('').map(l => `<span class="seq-rune">${Game.RUNES_BY_ID[l].sym}</span>`).join('')}<button class="seq-x" data-seqx="1">✕</button></div>`;
     }
 
-    const note = `<div class="rite-hint">What a rite does is for you to discover — record it in your <b>Notebook</b>.</div>`;
-    body.innerHTML = `<div class="slate">${cornersHtml}${center}</div>${picker}${note}`;
+    let hint = '';
+    if (count < Game.CONFIG.candleCount) { const n = Game.CONFIG.candleCount - count; hint = `<div class="slate-hint">Set ${n} more candle${n > 1 ? 's' : ''} from the shop.</div>`; }
+    else if (!lit) hint = `<div class="slate-hint">Tap each candle to light it.</div>`;
 
-    body.querySelectorAll('[data-candle]').forEach(c => c.addEventListener('click', () => {
-      const i = +c.dataset.candle; selectedCandle = (selectedCandle === i) ? null : i; forceRebuild(); render();
+    body.innerHTML = `<div class="slate">${seqHtml}${cornersHtml}${runesHtml}${hint}</div>
+      <div class="rite-hint">Tap runes to spell a rite — record what it does in your <b>Notebook</b>.</div>`;
+
+    body.querySelectorAll('[data-candle]').forEach(b => b.addEventListener('click', () => { Game.toggleCandle(+b.dataset.candle); act(true); }));
+    body.querySelectorAll('[data-rune]').forEach(b => b.addEventListener('click', () => {
+      const res = Game.tapRune(b.dataset.rune);
+      if (res && res.cast) toast('The runes flare, then the circle goes dark.');
+      else if (res && res.blocked === 'mana') toast('Not enough mana.');
+      act(true);
     }));
-    body.querySelectorAll('[data-setrune]').forEach(b => b.addEventListener('click', () => { Game.setRune(selectedCandle, b.dataset.setrune); act(true); }));
-    const snuff = body.querySelector('[data-snuff]');
-    if (snuff) snuff.addEventListener('click', () => { Game.toggleCandle(selectedCandle); selectedCandle = null; act(true); });
-    const castBtn = el('castBtn');
-    if (castBtn) castBtn.addEventListener('click', doCast);
-  }
-
-  function doCast() {
-    const res = Game.castRitual();
-    if (!res || res.blocked) { flashCenter(); if (res && res.reason === 'mana') toast('Not enough mana.'); return; }
-    toast('The runes flare, then the circle goes dark.');   // effect deliberately unspoken
-    act(true);
-  }
-  function flashCenter() {
-    const c = document.querySelector('.slate-center');
-    if (c) { c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); }
+    const sx = body.querySelector('[data-seqx]');
+    if (sx) sx.addEventListener('click', () => { Game.clearRuneSeq(); act(true); });
   }
 
   /* ---------- NOTEBOOK tab ---------- */
@@ -287,19 +267,24 @@ const UI = (() => {
       body.innerHTML = `<p class="tab-intro">Perform a rite at the Ritual slate and it will be recorded here — then jot down what you think it does.</p>`;
       return;
     }
-    let html = `<p class="tab-intro">Rites you have performed. Write your own notes on what each one does.</p>`;
+    const auto = Game.has('auto-ritual');
+    let html = `<p class="tab-intro">Rites you know. Write your own notes on what each one does.</p>`;
     html += disc.map(id => {
       const sp = Game.SPELLS_BY_ID[id];
-      const pat = sp.runes.map(rid => `<span class="mini-rune">${Game.RUNES_BY_ID[rid].sym}</span>`).join('');
+      const pat = sp.seq.map(l => `<span class="mini-rune">${Game.RUNES_BY_ID[l].sym}</span>`).join('');
       const note = (G().notes && G().notes[id]) ? G().notes[id] : '';
+      const on = G().autoCast && G().autoCast[id];
+      const autoBtn = auto ? `<button class="btn nb-auto ${on ? 'primary' : ''}" data-auto="${id}">${on ? 'Auto ✓' : 'Auto-cast'}</button>` : '';
       return `<div class="nb-spell">
           <div class="nb-head"><div class="spell-pat">${pat}</div>
-            <div class="spell-info"><div class="spell-name">Unnamed rite</div><div class="spell-desc muted">one of each rune · ${sp.mana}✦</div></div></div>
+            <div class="spell-info"><div class="spell-name">Unnamed rite <span class="spell-mana">${sp.mana}✦</span></div></div>
+            ${autoBtn}</div>
           <textarea class="nb-notes" data-note="${id}" placeholder="What does it do?">${escapeHtml(note)}</textarea>
         </div>`;
     }).join('');
     body.innerHTML = html;
     body.querySelectorAll('[data-note]').forEach(t => t.addEventListener('input', () => { Game.setNote(t.dataset.note, t.value); Game.save(); }));
+    body.querySelectorAll('[data-auto]').forEach(b => b.addEventListener('click', () => { Game.toggleAutoCast(b.dataset.auto); act(true); }));
   }
 
   /* ---------- COMBAT ---------- */
@@ -490,8 +475,8 @@ const UI = (() => {
       let ok = cents >= +b.dataset.cost;
       if (b.dataset.needslot) ok = ok && G().planters.some(p => !p.seed);
       b.classList.toggle('disabled', !ok);
+      if (b.hasAttribute('data-buy')) b.classList.toggle('ready', ok);   // gold pulse when affordable
     });
-    const cb = el('castBtn'); if (cb) cb.classList.toggle('disabled', !Game.canCastRitual());
   }
 
   function updateCombatLive() {
