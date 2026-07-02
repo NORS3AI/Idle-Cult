@@ -193,8 +193,30 @@ const Game = (() => {
   }
   function effGrow(seed) { return seed.grow / growthSpeed(); }
   function speed() { return state.gameSpeed || 1; }        // selector level ×1…×10
-  function speedFactor() { return Math.pow(2, speed() - 1); } // each level halves time (×1→1, ×5→16, ×10→512)
+  function speedFactor() { return Math.pow(2, speed() - 1); } // plant growth: each level halves time (×1→1, ×10→512)
   function cycleSpeed() { state.gameSpeed = (speed() % CONFIG.maxSpeed) + 1; return state.gameSpeed; }
+
+  /* Expeditions use FIXED endpoints, not the exponential plant speed:
+     ×1 wall time = area.duration, ×10 wall time = area.dur10, and ×2–×9 are
+     a straight-line interpolation between the two. */
+  function expeditionTime(area, s) {
+    s = Math.max(1, Math.min(CONFIG.maxSpeed, s || 1));
+    const d1 = area.duration, d10 = (area.dur10 != null ? area.dur10 : area.duration);
+    return d1 + (d10 - d1) * (s - 1) / (CONFIG.maxSpeed - 1);
+  }
+  // how many game-seconds elapse per real second for the current expedition
+  function expeditionFactor(area, s) {
+    const t = expeditionTime(area, s);
+    return t > 0 ? area.duration / t : 1;
+  }
+  // includes the compass bonus — used for both simulation and the on-screen timer
+  function combatFactor() {
+    const c = state.combat; if (!c) return 1;
+    const area = AREAS_BY_ID[c.areaId]; if (!area) return 1;
+    return expeditionFactor(area, speed()) * (has('compass') ? CONFIG.compassSpeed : 1);
+  }
+  // event spacing scales with the run length so every location gets ~12–20 events
+  function eventGap(dur) { return rnd(CONFIG.eventGapMin, CONFIG.eventGapMax) * dur; }
   function manaMax() { return CONFIG.manaMax; }
   function manaRegenPerSec() { return CONFIG.manaRegenPerHour / 3600; }
   function ritualManaCost() { return SPELLS[0].mana; }
@@ -217,7 +239,8 @@ const Game = (() => {
     for (const s of SEEDS) if (!state.unlockedSeeds.includes(s.id)) return s;
     return null;
   }
-  function ritualUnlocked() { return state.items[CONFIG.ritualUnlockItem] > 0; }
+  // the Ritual slate unlocks once all four candles are purchased (not the map)
+  function ritualUnlocked() { return candleCount() >= CONFIG.candleCount; }
   function candleCount() { return state.items.candle || 0; }
 
   /* ---------- state setup ---------- */
@@ -367,38 +390,57 @@ const Game = (() => {
     state.combat = {
       areaId, elapsed: 0, duration: area.duration,
       hp: Math.round(maxHp() * (1 + vigor / 100)), runCash: 0, runMana: 0, runBlood: 0, log: [],
-      nextEventAt: rnd(CONFIG.eventMin, CONFIG.eventMax),
+      nextEventAt: eventGap(area.duration),
       shieldRemaining: 0, status: 'running', paused: false,
     };
     return true;
   }
   function togglePause() { const c = state.combat; if (c && c.status === 'running') c.paused = !c.paused; }
 
-  function fireEvent(c, area) {
-    const total = area.events.reduce((s, e) => s + e.w, 0);
-    let r = Math.random() * total, ev = area.events[0];
-    for (const e of area.events) { if ((r -= e.w) <= 0) { ev = e; break; } }
-    let name = ev.name;
-    if (name === '@boss' && area.bosses) name = area.bosses[irnd(0, area.bosses.length - 1)];
-    let dmg = (ev.d || 0) * area.dmg;
+  function applyDmg(c, area, raw) {
+    let dmg = raw;
     if (dmg && c.shieldRemaining > 0) {
       const block = Math.min(0.95, shieldTier().block + trinketBonus(area.id, 'ward') / 100);
       dmg = Math.round(dmg * (1 - block));
     }
-    // loot accrues each event, scaled to the location; totals clamp to the reward range on completion
-    const cash = Math.floor(Math.random() * area.cashMax / 8);
-    const mana = Math.floor(Math.random() * area.manaMax / 8);
-    c.hp -= dmg; c.runCash += cash; c.runMana += mana;
-    c.log.push({ t: Math.round(c.elapsed), name, dmg, cash, mana });
-    if (c.log.length > 40) c.log.shift();
+    c.hp -= dmg;
     if (c.hp <= 0) { c.hp = 0; c.status = 'dead'; }
+    return dmg;
   }
 
-  function tickCombat(sdt) {
+  function fireEvent(c, area) {
+    const total = area.events.reduce((s, e) => s + e.w, 0);
+    let r = Math.random() * total, ev = area.events[0];
+    for (const e of area.events) { if ((r -= e.w) <= 0) { ev = e; break; } }
+    const dmg = applyDmg(c, area, (ev.d || 0) * area.dmg);
+    // regular encounters give only a small trickle — the boss provides the bulk
+    const cash = irnd(0, Math.max(1, Math.floor(area.cashMin / 8)));
+    const mana = irnd(0, Math.max(1, Math.floor(area.manaMin / 8)));
+    c.runCash += cash; c.runMana += mana;
+    c.log.push({ t: Math.round(c.elapsed), name: ev.name, dmg, cash, mana });
+    if (c.log.length > 40) c.log.shift();
+  }
+
+  // the finale: a named boss that lands the largest single haul of the run
+  function fireBoss(c, area) {
+    const name = (area.bosses && area.bosses.length)
+      ? area.bosses[irnd(0, area.bosses.length - 1)]
+      : (area.boss || 'Boss');
+    const dmg = applyDmg(c, area, area.dmg * 2);   // hits harder than a normal wound
+    const cash = Math.round(rnd(CONFIG.bossCashMin, CONFIG.bossCashMax) * area.cashMax);
+    const mana = Math.round(rnd(CONFIG.bossCashMin, CONFIG.bossCashMax) * area.manaMax);
+    const blood = area.bloodMax ? irnd(Math.ceil(area.bloodMin * 0.6), area.bloodMax) : 0;
+    c.runCash += cash; c.runMana += mana; c.runBlood += blood;
+    c.log.push({ t: Math.round(c.elapsed), name, dmg, cash, mana, blood, boss: true });
+    if (c.log.length > 40) c.log.shift();
+  }
+
+  function tickCombat(dt) {
     const c = state.combat;
     if (!c || c.status !== 'running' || c.paused) return;
     const area = AREAS_BY_ID[c.areaId];
-    sdt *= (has('compass') ? CONFIG.compassSpeed : 1);   // compass: faster expeditions
+    // expeditions advance at their own fixed-endpoint rate (not the plant speed)
+    const sdt = dt * combatFactor();
     c.elapsed += sdt;
     if (c.shieldRemaining > 0) c.shieldRemaining = Math.max(0, c.shieldRemaining - sdt);
     // poultice: passive healing (+1 heart every N seconds), never above max
@@ -407,18 +449,22 @@ const Game = (() => {
       while (c.healAcc >= CONFIG.poulticeHealEvery) { c.healAcc -= CONFIG.poulticeHealEvery; if (c.hp < maxHp()) c.hp++; }
     }
     let guard = 0;
-    while (c.status === 'running' && c.elapsed >= c.nextEventAt && c.nextEventAt < c.duration && guard++ < 50) {
+    while (c.status === 'running' && c.elapsed >= c.nextEventAt && c.nextEventAt < c.duration && guard++ < 60) {
       fireEvent(c, area);
-      c.nextEventAt += rnd(CONFIG.eventMin, CONFIG.eventMax);
+      c.nextEventAt += eventGap(c.duration);
     }
     if (c.status === 'running' && c.elapsed >= c.duration) {
-      c.elapsed = c.duration; c.status = 'complete';
-      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-      c.reward = {
-        cash: clamp(c.runCash, area.cashMin, area.cashMax),
-        mana: clamp(c.runMana, area.manaMin, area.manaMax),
-        blood: irnd(area.bloodMin, area.bloodMax),
-      };
+      c.elapsed = c.duration;
+      fireBoss(c, area);                    // the final encounter, biggest loot
+      if (c.status === 'running') c.status = 'complete';   // fireBoss may have killed us
+      if (c.status === 'complete') {
+        const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+        c.reward = {
+          cash: clamp(c.runCash, area.cashMin, area.cashMax),
+          mana: clamp(c.runMana, area.manaMin, area.manaMax),
+          blood: clamp(c.runBlood, area.bloodMin, area.bloodMax),
+        };
+      }
     }
   }
 
@@ -462,7 +508,7 @@ const Game = (() => {
     const complete = c.status === 'complete';
     let cash, mana, blood;
     if (complete && c.reward) { cash = c.reward.cash; mana = c.reward.mana; blood = c.reward.blood; }
-    else { cash = Math.min(c.runCash, area.cashMax); mana = Math.min(c.runMana, area.manaMax); blood = irnd(area.bloodMin, area.bloodMax); }
+    else { cash = Math.min(c.runCash, area.cashMax); mana = Math.min(c.runMana, area.manaMax); blood = Math.min(c.runBlood, area.bloodMax); }
     // bonuses: field-upgrade loot % + active trinket for this location
     cash = Math.round(cash * (1 + cashLootPct() + trinketBonus(area.id, 'cash') / 100));
     mana = Math.round(mana * (1 + manaLootPct() + trinketBonus(area.id, 'mana') / 100));
@@ -520,7 +566,7 @@ const Game = (() => {
         }
       }
     }
-    tickCombat(sdt);
+    tickCombat(dt);   // expeditions use their own fixed-endpoint speed
   }
 
   /* ---------- offline progress (closed-form) ---------- */
@@ -641,6 +687,7 @@ const Game = (() => {
     get state() { return state; },
     fmtMoney, fmtNum, fmtTime, now,
     multiplier, growthSpeed, effGrow, slotCount, speed, speedFactor, cycleSpeed,
+    expeditionTime, expeditionFactor, combatFactor,
     setDevMode, devMode, devGive,
     manaRegenPerSec, ritualManaCost, has, tabUnlocked, avgPlantedSell, ledgerPerSec, autoHarvest, autoHarvestOn, toggleAutoHarvest,
     maxHp, hpAdded, cashLootPct, manaLootPct, fieldCost, fieldNextAmount,

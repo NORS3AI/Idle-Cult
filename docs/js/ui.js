@@ -231,7 +231,7 @@ const UI = (() => {
     const body = el('ritualBody');
     if (!Game.ritualUnlocked()) {
       card.classList.add('locked');
-      body.innerHTML = `<div class="locked-veil">Sealed — chart the grove with a <b>map</b> to begin.</div>`;
+      body.innerHTML = `<div class="locked-veil">Sealed — set all four <b>candles</b> (${Game.candleCount()}/${Game.CONFIG.candleCount}) to complete the circle.</div>`;
       return;
     }
     card.classList.remove('locked');
@@ -324,8 +324,10 @@ const UI = (() => {
       const bits = [];
       if (e.dmg) bits.push(`<span class="ev-hp">❤ -${Game.fmtNum(e.dmg)}</span>`);
       if (e.cash) bits.push(`<span class="ev-cash">${Game.fmtMoney(e.cash)}</span>`);
-      if (e.mana) bits.push(`<span class="ev-mana">✦ ${Game.fmtNum(e.mana)}</span>`);
-      return `<div class="ev-row"><span class="ev-t">${Game.fmtTime(e.t)}</span><span class="ev-name">${e.name}</span><span class="ev-eff">${bits.join(', ')}</span></div>`;
+      if (e.mana) bits.push(`<span class="ev-mana"><span class="mi">✦</span> ${Game.fmtNum(e.mana)}</span>`);
+      if (e.blood) bits.push(`<span class="ev-blood">🩸 ${Game.fmtNum(e.blood)}</span>`);
+      const nm = e.boss ? `👑 ${e.name}` : e.name;
+      return `<div class="ev-row${e.boss ? ' boss' : ''}"><span class="ev-t">${Game.fmtTime(e.t)}</span><span class="ev-name">${nm}</span><span class="ev-eff">${bits.join(', ')}</span></div>`;
     }).join('') || '<div class="ev-row muted"><span class="ev-name">The expedition begins…</span></div>';
 
     // field upgrades
@@ -374,7 +376,7 @@ const UI = (() => {
         <div class="loc-sub">${rewardLine}</div>
       </div>
       <div class="prog-head"><span>Progress</span>
-        <span class="prog-right"><span id="progTime">${running ? Game.fmtTime((c.duration - c.elapsed) / Game.speed()) : ''}</span>
+        <span class="prog-right"><span id="progTime">${running ? Game.fmtTime((c.duration - c.elapsed) / Game.combatFactor()) : ''}</span>
         ${running ? `<button class="pause-btn ${c.paused ? 'paused' : ''}" id="pauseBtn">${c.paused ? '▶' : '⏸'}</button>` : ''}</span></div>
       ${bar(pct, 'combat')}
       <div class="combat-cols">
@@ -433,7 +435,7 @@ const UI = (() => {
           <div class="loc-sub">Reward: ${rewardLine}</div>
           ${trinketRow}
           <div class="area-foot">
-            <span class="visit-cost">Visit: ${Game.fmtMoney(a.visitCost)}</span>
+            <span class="visit-cost">Visit: ${Game.fmtMoney(a.visitCost)} · ⏱ ${Game.fmtTime(a.duration)}</span>
             <button class="btn primary area-start" data-area="${a.id}" data-cost="${a.visitCost}">Enter</button>
           </div>
         </div>`;
@@ -555,7 +557,7 @@ const UI = (() => {
     const fill = document.querySelector('.bar.combat .bar-fill');
     if (fill) fill.style.width = Math.min(100, c.elapsed / c.duration * 100) + '%';
     if (c.status === 'running') {
-      const pt = el('progTime'); if (pt) pt.textContent = Game.fmtTime((c.duration - c.elapsed) / Game.speedFactor());
+      const pt = el('progTime'); if (pt) pt.textContent = Game.fmtTime((c.duration - c.elapsed) / Game.combatFactor());
       const hn = el('hpNow'); if (hn) hn.innerHTML = `<span class="hp-badge">❤ ${Game.fmtNum(c.hp)}</span>`;
       const ln = document.querySelector('.run-foot .loot-now'); if (ln) ln.innerHTML = `<span class="l-cash">${Game.fmtMoney(c.runCash)}</span> · <span class="l-mana"><span class="mi">✦</span> ${Game.fmtNum(c.runMana)}</span>`;
       const pool = G().cents + c.runCash, mpool = G().mana + c.runMana;

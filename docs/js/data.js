@@ -50,7 +50,7 @@ const ITEMS = [
   },
   {
     id: 'map', name: 'map', kind: 'once', base: 5800,
-    desc: 'Charts the hidden grove — unlocks the Ritual slate and the Combat map.',
+    desc: 'Charts the hidden grove — unlocks the Combat map and its expeditions.',
   },
   {
     id: 'notebook', name: 'notebook', kind: 'once', base: 7600,
@@ -147,13 +147,18 @@ const FIELD_UPGRADES = [
 
 /* Expedition locations. cash/visitCost in CENTS; blood/mana are counts.
    `dmg` = hearts lost per wounding hit (event.d is a 0/1/2 multiplier).
-   `duration` = seconds at ×1 speed (÷512 at ×10 — "stupid fast but scaled").
+   `duration` = seconds at ×1 speed (the normal expedition length).
+   `dur10`    = FIXED seconds at ×10 speed (not calculated). Speeds ×2–×9
+                interpolate linearly between `duration` and `dur10`.
+                (1x minutes == 10x seconds: 60s/1s, 19m/19s, 37m/37s, …)
+   `boss`     = the final encounter, which awards the largest loot.
    `trinketChance` = drop chance on completion (0..1). */
 const _y = 31536000, _d = 86400;   // seconds in a year / day
 const AREAS = [
   { id: 'dulling', name: 'The Dulling', icon: '🌗',
     flavor: 'The between of the light and the dark',
-    visitCost: _c(20), duration: 60,               /* 60s at ×1 (≈1s at ×10) */
+    visitCost: _c(20), duration: 60, dur10: 1,     /* 60s ×1 → 1s ×10 */
+    boss: 'The Nightmother',
     riskMin: 5, riskMax: 14, dmg: 1, trinketChance: 0,
     cashMin: _c(23), cashMax: _c(56), manaMin: 10, manaMax: 25, bloodMin: 0, bloodMax: 0,
     events: [
@@ -166,7 +171,8 @@ const AREAS = [
     ] },
   { id: 'blacktide', name: 'Blacktide Bay', icon: '🏴‍☠️',
     flavor: 'A coastal hideout where contraband and pirates lay in hiding',
-    visitCost: _c(200), duration: 9728,            /* ×10 = 19s */
+    visitCost: _c(200), duration: 1140, dur10: 19, /* 19m ×1 → 19s ×10 */
+    boss: 'The Captain',
     riskMin: 29, riskMax: 56, dmg: 6, trinketChance: 0.01,
     cashMin: _c(281), cashMax: _c(521), manaMin: 59, manaMax: 149, bloodMin: 1, bloodMax: 2,
     events: [
@@ -178,7 +184,8 @@ const AREAS = [
     ] },
   { id: 'cathedral', name: "Mad Max's Cathedral", icon: '⛪',
     flavor: 'A decrepit church filled with the dead and dust',
-    visitCost: _c(3000), duration: 18944,          /* ×10 = 37s */
+    visitCost: _c(3000), duration: 2220, dur10: 37, /* 37m ×1 → 37s ×10 */
+    boss: 'The Vampire Lord',
     riskMin: 251, riskMax: 300, dmg: 40, trinketChance: 0.04,
     cashMin: _c(4460), cashMax: _c(7520), manaMin: 507, manaMax: 689, bloodMin: 3, bloodMax: 15,
     events: [
@@ -189,7 +196,8 @@ const AREAS = [
     ] },
   { id: 'windsor', name: 'Windsor Castle', icon: '🏰',
     flavor: 'A fortress hiding a hidden darkness',
-    visitCost: _c(80000), duration: 33792,          /* ×10 = 66s */
+    visitCost: _c(80000), duration: 3960, dur10: 66, /* 66m ×1 → 66s ×10 */
+    boss: 'The Stone Sentinel',
     riskMin: 1920, riskMax: 2280, dmg: 300, trinketChance: 0.07,
     cashMin: _c(120000), cashMax: _c(200000), manaMin: 7090, manaMax: 8880, bloodMin: 38, bloodMax: 71,
     events: [
@@ -200,7 +208,8 @@ const AREAS = [
     ] },
   { id: 'bright', name: 'The Bright Court', icon: '☀️',
     flavor: 'The High Heavens on earth',
-    visitCost: _c(2e6), duration: 50688,           /* ×10 = 99s */
+    visitCost: _c(2e6), duration: 5940, dur10: 99, /* 99m ×1 → 99s ×10 */
+    boss: 'The Archon',
     riskMin: 16300, riskMax: 18900, dmg: 2500, trinketChance: 0.11,
     cashMin: _c(2.9e6), cashMax: _c(5.1e6), manaMin: 855, manaMax: 1260, bloodMin: 190, bloodMax: 255, // cash inferred
     events: [
@@ -211,7 +220,8 @@ const AREAS = [
     ] },
   { id: 'forgotten', name: 'The Forgotten Court', icon: '🌲',
     flavor: 'Where the forgotten things roam',
-    visitCost: _c(90e6), duration: 74240,          /* ×10 = 145s */
+    visitCost: _c(90e6), duration: 8700, dur10: 145, /* 145m ×1 → 145s ×10 */
+    boss: 'The Forgotten One',
     riskMin: 112000, riskMax: 125000, dmg: 17000, trinketChance: 0.17,
     cashMin: _c(135e6), cashMax: _c(322e6), manaMin: 12500, manaMax: 18000, bloodMin: 533, bloodMax: 640,
     events: [
@@ -222,7 +232,7 @@ const AREAS = [
     ] },
   { id: 'void', name: 'The Void', icon: '🌌',
     flavor: "Nyl'Thraxil was born from the throat of a dying star",
-    visitCost: _c(130e12), duration: 128000,       /* ×10 = 250s */
+    visitCost: _c(130e12), duration: 15000, dur10: 250, /* 250m ×1 → 250s ×10 */
     riskMin: 5450000, riskMax: 9000000, dmg: 1e6, trinketChance: 0.29,
     cashMin: _c(200e12), cashMax: _c(400e12), manaMin: 651e6, manaMax: 1.1e9, bloodMin: 65e6, bloodMax: 119e6, // ~1.5-3× the $130t visit cost
     bosses: ["Nyl'Thraxil", "Vyx'alith", "Dra'vah", "Mal'khorith", 'Cadence'],
@@ -230,7 +240,7 @@ const AREAS = [
       { name: 'cold silence', w: 8, d: 0 }, { name: 'distant star', w: 7, d: 0 }, { name: 'stardust', w: 7, d: 0 },
       { name: 'passing comet', w: 6, d: 0 }, { name: 'asteroid', w: 5, d: 1 }, { name: 'void spawn', w: 5, d: 1 },
       { name: 'dying sun', w: 4, d: 1 }, { name: 'planet-eater', w: 4, d: 1 }, { name: 'gravity well', w: 3, d: 1 },
-      { name: 'void horror', w: 3, d: 1 }, { name: 'star leviathan', w: 2, d: 1 }, { name: '@boss', w: 1, d: 2 },
+      { name: 'void horror', w: 3, d: 1 }, { name: 'star leviathan', w: 2, d: 1 }, { name: 'star tyrant', w: 1, d: 2 },
     ] },
 ];
 const AREAS_BY_ID = Object.fromEntries(AREAS.map(a => [a.id, a]));
@@ -268,7 +278,10 @@ const CONFIG = {
   startCents: 10,
   ledgerFlat: 4,                // ledger passive income: $0.04/s (4 cents)
   baseHp: 10,                   // starting maximum hearts
-  eventMin: 2, eventMax: 3,     // seconds between expedition events
+  // expedition events are spaced as a FRACTION of the run's duration, so every
+  // location gets a similar number of encounters (~12–20) regardless of length.
+  eventGapMin: 0.05, eventGapMax: 0.09,
+  bossCashMin: 0.55, bossCashMax: 0.80,  // boss loot as a fraction of the area's max
   autoHarvestMana: 1,           // mana per crop (harvest + replant) for the auto-harvester
   thuribleHaste: 0.05,          // +5% plant growth speed
   compassSpeed: 1.5,            // expeditions run 50% faster
@@ -286,14 +299,14 @@ const CONFIG = {
 
   baseSlots: 1,
   offlineCapSeconds: 24 * 3600,  // cap offline progress at 24 hours
-  ritualUnlockItem: 'map',       // ritual slate unlocked by buying the map
+  ritualUnlockItem: 'candle',    // ritual slate unlocks once all four candles are set
   candleCount: 4,
   ritualHalve: 0.5,              // a rite halves the remaining grow time
   manaMax: 100,                  // mana ceiling (raised later via Research)
   manaRegenPerHour: 5,           // mana recharge rate
   candleFreeMana: 100,           // free mana granted when the 4th candle is set
   buyPageSize: 4,                // shop shows four upgrades at a time
-  maxSpeed: 10,                  // game-speed selector cycles ×1 … ×10 (each step halves time)
+  maxSpeed: 10,                  // game-speed selector cycles ×1 … ×10
   dailyResetSeconds: 3600,       // daily quests refresh every hour
   runeSeqTimeout: 20,            // seconds before a tapped rune sequence auto-clears
   hasteStackPct: 0.05,           // +5% plant speed per Thurible-rite cast
@@ -302,6 +315,13 @@ const CONFIG = {
 
 /* Patch notes — newest first. Shown in Settings. */
 const PATCH_NOTES = [
+  { v: '2.1', title: 'Boss finales & fixed expedition speeds', items: [
+    'Every expedition now ends with a named boss — the final entry in the event log and the biggest haul of the run ($, mana, and blood where it drops).',
+    'Encounters keep scrolling the event log at every speed, just faster as you crank it up.',
+    'Expedition speeds are now fixed endpoints: ×1 is the full length, ×10 is the set time (Dulling 1s, Blacktide 19s, Cathedral 37s, Windsor 66s, Bright 99s, Forgotten 145s, Void 250s); ×2–×9 fall in between.',
+    'The area picker now shows how long each expedition takes at ×1 next to its visit cost.',
+    'Ritual Slate fix: it no longer needs the map — it unlocks once all four candles are set.',
+  ] },
   { v: '2.0', title: 'Expedition loot colours & Dulling fix', items: [
     'Expedition loot now reads in colour — cash in green, mana in blue.',
     'The mana glyph (✦) is bigger and blue everywhere it appears.',
