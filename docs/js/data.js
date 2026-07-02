@@ -301,6 +301,9 @@ const CONFIG = {
 
 /* Patch notes — newest first. Shown in Settings. */
 const PATCH_NOTES = [
+  { v: '1.7', title: 'Auto-harvest toggle', items: [
+    'Once you own the auto-harvester, a ⟳✦ checkbox in the Planters box turns it on/off. Unchecked = plant and sell by hand as normal.',
+  ] },
   { v: '1.6', title: 'Ritual feedback, big runes & fixes', items: [
     'Casting the quickening rite flashes a plant\'s progress bar green and tags it with a ⏱ badge (⏱ 1 → 1.1 → 1.2 … until harvest).',
     'Runes are now big, reliable buttons in a bar below the slate — much easier to press.',

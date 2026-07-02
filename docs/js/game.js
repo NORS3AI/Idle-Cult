@@ -99,7 +99,9 @@ const Game = (() => {
   function ledgerPerSec() {
     return has('ledger') ? CONFIG.ledgerFlat : 0;   // flat $0.40/s
   }
-  function autoHarvest() { return has('auto-harvester'); }
+  function autoHarvest() { return has('auto-harvester') && state.autoHarvestOn !== false; }
+  function autoHarvestOn() { return state.autoHarvestOn !== false; }   // checkbox state (default on)
+  function toggleAutoHarvest() { state.autoHarvestOn = (state.autoHarvestOn === false); }
 
   /* ---------- combat stats ---------- */
   function incHp(i) { return i < 2 ? 1 : i; }              // +1,+1,+2,+3,+4,+5,+6,…
@@ -232,6 +234,7 @@ const Game = (() => {
       notes: {},
       hpBought: 0, cashLootBought: 0, manaLootBought: 0,
       combat: null,
+      autoHarvestOn: true,
       blood: 0,
       trinkets: {},          // trinketId → value%
       activeTrinket: {},     // areaId → trinketId
@@ -581,6 +584,7 @@ const Game = (() => {
     ['hasteStacks', 'runeSeqAt', 'hpBought', 'cashLootBought', 'manaLootBought', 'prestigePoints', 'hpBonus', 'scrolls', 'dailyHarvests', 'dailyResetAt', 'blood']
       .forEach(k => { if (typeof s[k] !== 'number') s[k] = 0; });
     ['prestigeUnlocked', 'devMode', 'hasPrestiged'].forEach(k => { if (typeof s[k] !== 'boolean') s[k] = false; });
+    if (typeof s.autoHarvestOn !== 'boolean') s.autoHarvestOn = true;
     if (!Array.isArray(s.questClaimed) || s.questClaimed.length !== DAILY_QUESTS.length) s.questClaimed = DAILY_QUESTS.map(() => false);
     if (s.combat === undefined) s.combat = null;
     if (!(s.gameSpeed >= 1 && s.gameSpeed <= CONFIG.maxSpeed)) s.gameSpeed = 1;
@@ -631,7 +635,7 @@ const Game = (() => {
     fmtMoney, fmtNum, fmtTime, now,
     multiplier, growthSpeed, effGrow, slotCount, speed, speedFactor, cycleSpeed,
     setDevMode, devMode, devGive,
-    manaRegenPerSec, ritualManaCost, has, tabUnlocked, avgPlantedSell, ledgerPerSec, autoHarvest,
+    manaRegenPerSec, ritualManaCost, has, tabUnlocked, avgPlantedSell, ledgerPerSec, autoHarvest, autoHarvestOn, toggleAutoHarvest,
     maxHp, hpAdded, cashLootPct, manaLootPct, fieldCost, fieldNextAmount,
     itemPrice, itemStockLeft, itemSoldOut, nextLockedSeed,
     ritualUnlocked, candleCount, toggleCandle,

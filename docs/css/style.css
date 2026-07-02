@@ -224,6 +224,11 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 }
 /* time-icon badge on a plant that a rite has quickened */
 .rite-badge { font-size: 12px; font-weight: 700; color: var(--good); white-space: nowrap; }
+/* auto-harvest toggle in the Planters box */
+.auto-toggle { display: flex; align-items: center; gap: 8px; padding: 6px 2px 12px; cursor: pointer; font-size: 15px; }
+.auto-toggle input { width: 20px; height: 20px; }
+.ah-icons { color: var(--good); font-weight: 700; }
+.ah-label { color: var(--text); }
 
 /* ---------- RITUAL ---------- */
 .card.ritual { position: relative; overflow: hidden; }
