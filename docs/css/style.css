@@ -211,6 +211,19 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 .bar.thin { height: 6px; }
 .bar-fill { height: 100%; background: #efeae0; border-radius: 999px; transition: width .15s linear; }
 .bar.done .bar-fill { background: var(--good); }
+/* ritual applied: flash the progress bar green three times */
+.bar.flash3 { animation: flash3 1.2s ease; }
+@keyframes flash3 {
+  0%, 100% { box-shadow: none; }
+  8% { box-shadow: 0 0 10px 2px rgba(127,176,105,.95); background: rgba(127,176,105,.55); }
+  17% { box-shadow: none; background: #2c2825; }
+  42% { box-shadow: 0 0 10px 2px rgba(127,176,105,.95); background: rgba(127,176,105,.55); }
+  50% { box-shadow: none; background: #2c2825; }
+  75% { box-shadow: 0 0 10px 2px rgba(127,176,105,.95); background: rgba(127,176,105,.55); }
+  83% { box-shadow: none; background: #2c2825; }
+}
+/* time-icon badge on a plant that a rite has quickened */
+.rite-badge { font-size: 12px; font-weight: 700; color: var(--good); white-space: nowrap; }
 
 /* ---------- RITUAL ---------- */
 .card.ritual { position: relative; overflow: hidden; }
@@ -293,16 +306,27 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 .candle .rune.dim { color: #5a544a; text-shadow: none; }
 .candle.sel { outline: 2px solid rgba(231,196,107,.5); outline-offset: 4px; border-radius: 10px; }
 
-/* tappable runes at N/E/S/W — each fades in with its candle */
+/* decorative runes at N/E/S/W — each fades in with its candle (not tappable) */
 .slate-rune {
-  position: absolute; z-index: 4; background: none; border: none; cursor: pointer;
-  color: #efe6cf; font-size: 30px; line-height: 1; padding: 12px;
+  position: absolute; z-index: 1; pointer-events: none;
+  color: #efe6cf; font-size: 30px; line-height: 1;
   text-shadow: 0 0 10px rgba(231,196,107,.35);
-  opacity: 0; pointer-events: none; transition: opacity .45s ease;
+  opacity: 0; transition: opacity .45s ease;
 }
-.slate-rune.shown { opacity: 1; pointer-events: auto; animation: runeFade .4s ease; }
-.slate-rune.shown:active { transform: scale(.9); }
+.slate-rune.shown { opacity: 1; animation: runeFade .4s ease; }
 @keyframes runeFade { from { opacity: 0; } to { opacity: 1; } }
+
+/* big, reliable rune buttons below the slate */
+.rune-bar { display: flex; gap: 8px; margin-top: 12px; }
+.rune-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-height: 60px; padding: 10px 4px; cursor: pointer;
+  background: var(--card-2); border: 1px solid var(--line); border-radius: 14px; color: var(--accent);
+}
+.rune-btn:active { transform: scale(.96); }
+.rune-btn.off { opacity: .35; color: var(--muted); pointer-events: none; }
+.rb-sym { font-size: 26px; line-height: 1; }
+.rb-let { font-size: 11px; color: var(--muted); font-weight: 600; }
 .pos-top    { top: 24%; left: 50%; transform: translateX(-50%); }
 .pos-bottom { bottom: 20%; left: 50%; transform: translateX(-50%); }
 .pos-left   { left: 28%; top: 50%; transform: translateY(-50%); }

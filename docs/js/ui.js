@@ -10,6 +10,8 @@ const UI = (() => {
   let buyMult = 1;                 // field-upgrade buy quantity (× stepper)
   const MULTS = [1, 5, 10, 25];
   let lastSig = '';
+  const flashState = {};           // planter index → last flashAt handled
+  function riteVal(n) { return n === 1 ? '1' : (1 + (n - 1) / 10).toFixed(1); }  // 1, 1.1, 1.2, …
 
   const el = id => document.getElementById(id);
   const G = () => Game.state;
@@ -50,7 +52,7 @@ const UI = (() => {
       s.candles.slice(0, 4).map(c => c.lit ? 'L' : 'd').join(''),
       Game.runeSeqStr(),
       (s.discovered || []).join(','),
-      s.planters.map(p => (p.seed || ('_' + (p.lastSeed || ''))) + (p.repeat ? 'R' : '')).join('|'),
+      s.planters.map(p => (p.seed || ('_' + (p.lastSeed || ''))) + (p.repeat ? 'R' : '') + (p.riteCount || 0)).join('|'),
       // combat
       s.combat ? s.combat.status + s.combat.log.length : 'nocombat',
       s.hpBought + '/' + s.cashLootBought + '/' + s.manaLootBought,
@@ -181,9 +183,10 @@ const UI = (() => {
       if (p.seed) {
         const seed = Game.SEEDS_BY_ID[p.seed];
         const grown = Game.isGrown(p);
+        const badge = p.riteCount > 0 ? ` <span class="rite-badge">⏱ ${riteVal(p.riteCount)}</span>` : '';
         html += `<div class="row planter" data-i="${i}">
             <div class="icon-box">${seed.icon}</div>
-            <div class="row-main"><div class="row-title">${seed.name}</div>${bar(grown ? 1 : Game.progress(p), grown ? 'done' : '')}</div>
+            <div class="row-main"><div class="row-title">${seed.name}${badge}</div>${bar(grown ? 1 : Game.progress(p), grown ? 'done' : '')}</div>
             <div class="row-price small time-${i}">${grown ? 'ready' : Game.fmtTime(Game.timeLeft(p))}</div>
             ${rep}
             <button class="btn ${grown ? '' : 'disabled'}" data-sell="${i}">Sell</button>
@@ -229,8 +232,8 @@ const UI = (() => {
       const c = G().candles[i], r = Game.RUNES[i];
       cornersHtml += `<div class="corner ${corners[i]} candle ${c.lit ? 'lit' : ''}" data-candle="${i}">
           <div class="flame"></div><div class="candle-body"></div></div>`;
-      // each candle reveals its rune; the rune fades in/out with the candle's lit state
-      runesHtml += `<button class="slate-rune pos-${r.pos} ${c.lit ? 'shown' : ''}" data-rune="${r.id}" title="${r.letter}">${r.sym}</button>`;
+      // decorative rune on the slate (fades with the candle) — NOT the tap target
+      runesHtml += `<span class="slate-rune pos-${r.pos} ${c.lit ? 'shown' : ''}">${r.sym}</span>`;
     }
 
     const seq = Game.runeSeqStr();
@@ -242,7 +245,15 @@ const UI = (() => {
     if (count < Game.CONFIG.candleCount) { const n = Game.CONFIG.candleCount - count; hint = `<div class="slate-hint">Set ${n} more candle${n > 1 ? 's' : ''} from the shop.</div>`; }
     else if (!Game.allCandlesLit()) hint = `<div class="slate-hint">Tap each candle to light its rune.</div>`;
 
+    // Big, reliable rune buttons below the slate (enabled once their candle is lit).
+    const runeBar = `<div class="rune-bar">${Game.RUNES.map((r, i) => {
+      const lit = i < count && G().candles[i].lit;
+      return `<button class="rune-btn ${lit ? '' : 'off'}" data-rune="${r.id}" ${lit ? '' : 'disabled'}>
+          <span class="rb-sym">${r.sym}</span><span class="rb-let">${r.letter}</span></button>`;
+    }).join('')}</div>`;
+
     body.innerHTML = `<div class="slate">${seqHtml}${cornersHtml}${runesHtml}${hint}</div>
+      ${runeBar}
       <div class="rite-hint">Tap runes to spell a rite — record what it does in your <b>Notebook</b>.</div>`;
 
     body.querySelectorAll('[data-candle]').forEach(b => b.addEventListener('click', () => { Game.toggleCandle(+b.dataset.candle); act(true); }));
@@ -506,6 +517,12 @@ const UI = (() => {
         const tm = document.querySelector(`.time-${i}`); if (tm) tm.textContent = grown ? 'ready' : Game.fmtTime(Game.timeLeft(p));
         const sb = document.querySelector(`[data-sell="${i}"]`); if (sb) sb.classList.toggle('disabled', !grown);
         const bo = document.querySelector(`.row.planter[data-i="${i}"] .bar`); if (bo) bo.classList.toggle('done', grown);
+      }
+      // ritual flash: replay the green pulse whenever a rite was just applied to this plant
+      if (p.flashAt && flashState[i] !== p.flashAt) {
+        const barEl = document.querySelector(`.row.planter[data-i="${i}"] .bar`);
+        if (barEl) { barEl.classList.remove('flash3'); void barEl.offsetWidth; barEl.classList.add('flash3'); }
+        flashState[i] = p.flashAt;
       }
     });
     document.querySelectorAll('[data-cost]').forEach(b => {
