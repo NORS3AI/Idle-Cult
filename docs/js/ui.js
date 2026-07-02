@@ -347,13 +347,13 @@ const UI = (() => {
     let footer;
     if (running) {
       footer = `<div class="run-foot">
-          <div class="loot-now">${Game.fmtMoney(c.runCash)} · ✦ ${Game.fmtNum(c.runMana)}</div>
+          <div class="loot-now"><span class="l-cash">${Game.fmtMoney(c.runCash)}</span> · <span class="l-mana"><span class="mi">✦</span> ${Game.fmtNum(c.runMana)}</span></div>
           <button class="btn" id="fleeBtn">Flee with loot</button>
         </div>`;
     } else if (c.status === 'complete') {
       footer = `<div class="run-foot done">
           <div class="foot-msg">✔ Expedition complete!</div>
-          <div class="loot-now">${Game.fmtMoney(c.reward.cash)} · ✦ ${Game.fmtNum(c.reward.mana)}${c.reward.blood ? ' · 🩸 ' + Game.fmtNum(c.reward.blood) : ''}</div>
+          <div class="loot-now"><span class="l-cash">${Game.fmtMoney(c.reward.cash)}</span> · <span class="l-mana"><span class="mi">✦</span> ${Game.fmtNum(c.reward.mana)}</span>${c.reward.blood ? ' · <span class="l-blood">🩸 ' + Game.fmtNum(c.reward.blood) + '</span>' : ''}</div>
           <button class="btn primary" id="collectBtn">Collect loot</button>
         </div>`;
     } else { // dead
@@ -363,7 +363,7 @@ const UI = (() => {
         </div>`;
     }
 
-    const rewardLine = `Reward: ${Game.fmtMoney(area.cashMin)}–${Game.fmtMoney(area.cashMax)} · ✦ ${Game.fmtNum(area.manaMin)}–${Game.fmtNum(area.manaMax)}`
+    const rewardLine = `Reward: ${Game.fmtMoney(area.cashMin)}–${Game.fmtMoney(area.cashMax)} · <span class="mi">✦</span> ${Game.fmtNum(area.manaMin)}–${Game.fmtNum(area.manaMax)}`
       + (area.bloodMax ? ` · 🩸 ${area.bloodMin}–${area.bloodMax}` : '')
       + (area.trinketChance ? ` · 💎 ${Math.round(area.trinketChance * 100)}%` : '');
     body.innerHTML = `
@@ -405,15 +405,15 @@ const UI = (() => {
 
   function lootMsg(verb, r) {
     if (!r) return '';
-    let s = `${verb} <b>${Game.fmtMoney(r.cash)}</b> · <b>✦${Game.fmtNum(r.mana)}</b>`;
-    if (r.blood) s += ` · <b>🩸${Game.fmtNum(r.blood)}</b>`;
+    let s = `${verb} <b class="l-cash">${Game.fmtMoney(r.cash)}</b> · <b class="l-mana"><span class="mi">✦</span>${Game.fmtNum(r.mana)}</b>`;
+    if (r.blood) s += ` · <b class="l-blood">🩸${Game.fmtNum(r.blood)}</b>`;
     if (r.trinket) s += ` — <b>${r.trinket.name}</b> ${r.trinket.dup ? '+1% (now ' + r.trinket.value + '%)' : 'found!'}`;
     return s;
   }
 
   function renderAreaPicker() {
     const cards = Game.AREAS.map(a => {
-      const rewardLine = `${Game.fmtMoney(a.cashMin)}–${Game.fmtMoney(a.cashMax)} · ✦${Game.fmtNum(a.manaMin)}–${Game.fmtNum(a.manaMax)}`
+      const rewardLine = `${Game.fmtMoney(a.cashMin)}–${Game.fmtMoney(a.cashMax)} · <span class="mi">✦</span>${Game.fmtNum(a.manaMin)}–${Game.fmtNum(a.manaMax)}`
         + (a.bloodMax ? ` · 🩸${a.bloodMin}–${a.bloodMax}` : '')
         + (a.trinketChance ? ` · 💎${Math.round(a.trinketChance * 100)}%` : '');
       // owned trinkets for this location → activate one
@@ -557,7 +557,7 @@ const UI = (() => {
     if (c.status === 'running') {
       const pt = el('progTime'); if (pt) pt.textContent = Game.fmtTime((c.duration - c.elapsed) / Game.speedFactor());
       const hn = el('hpNow'); if (hn) hn.innerHTML = `<span class="hp-badge">❤ ${Game.fmtNum(c.hp)}</span>`;
-      const ln = document.querySelector('.run-foot .loot-now'); if (ln) ln.textContent = `${Game.fmtMoney(c.runCash)} · ✦ ${Game.fmtNum(c.runMana)}`;
+      const ln = document.querySelector('.run-foot .loot-now'); if (ln) ln.innerHTML = `<span class="l-cash">${Game.fmtMoney(c.runCash)}</span> · <span class="l-mana"><span class="mi">✦</span> ${Game.fmtNum(c.runMana)}</span>`;
       const pool = G().cents + c.runCash, mpool = G().mana + c.runMana;
       document.querySelectorAll('[data-field]').forEach(b => {
         const cost = Game.fieldCost(b.dataset.field);

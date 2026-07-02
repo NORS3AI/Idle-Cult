@@ -463,6 +463,11 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 .run-foot .foot-msg { font-weight: 700; }
 .run-foot.done .foot-msg { color: var(--good); }
 .run-foot.dead .foot-msg { color: #e0607a; }
+/* expedition loot colours: cash green, mana blue, bigger mana glyph everywhere */
+.l-cash { color: var(--good); }
+.l-mana { color: #7db0e8; }
+.l-blood { color: #e0607a; }
+.mi { font-size: 1.3em; color: #7db0e8; line-height: 1; vertical-align: -0.06em; }
 .run-foot.dead .btn, .run-foot.dead { }
 .trinket-box { margin-top: 14px; font-size: 22px; }
 

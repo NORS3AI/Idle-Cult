@@ -153,7 +153,7 @@ const _y = 31536000, _d = 86400;   // seconds in a year / day
 const AREAS = [
   { id: 'dulling', name: 'The Dulling', icon: '🌗',
     flavor: 'The between of the light and the dark',
-    visitCost: _c(20), duration: 512,              /* ×10 = 1s */
+    visitCost: _c(20), duration: 60,               /* 60s at ×1 (≈1s at ×10) */
     riskMin: 5, riskMax: 14, dmg: 1, trinketChance: 0,
     cashMin: _c(23), cashMax: _c(56), manaMin: 10, manaMax: 25, bloodMin: 0, bloodMax: 0,
     events: [
@@ -302,6 +302,11 @@ const CONFIG = {
 
 /* Patch notes — newest first. Shown in Settings. */
 const PATCH_NOTES = [
+  { v: '2.0', title: 'Expedition loot colours & Dulling fix', items: [
+    'Expedition loot now reads in colour — cash in green, mana in blue.',
+    'The mana glyph (✦) is bigger and blue everywhere it appears.',
+    'Fixed The Dulling taking ~8 minutes — it is now 60s at ×1 speed as intended.',
+  ] },
   { v: '1.9', title: 'Prestige & mana tuning', items: [
     'Prestige points now cost $50 for the first, then +10% each (shown as "next point costs").',
     'Mana no longer trickles up on its own — it only comes from combat or the dev panel.',
