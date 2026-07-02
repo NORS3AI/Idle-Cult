@@ -47,6 +47,7 @@ const UI = (() => {
       s.unlockedSeeds.join(','),
       JSON.stringify(s.items),
       Game.ritualUnlocked(),
+      s.candles.slice(0, 4).map(c => c.lit ? 'L' : 'd').join(''),
       Game.runeSeqStr(),
       (s.discovered || []).join(','),
       s.planters.map(p => (p.seed || ('_' + (p.lastSeed || ''))) + (p.repeat ? 'R' : '')).join('|'),
@@ -244,8 +245,7 @@ const UI = (() => {
     body.innerHTML = `<div class="slate">${seqHtml}${cornersHtml}${runesHtml}${hint}</div>
       <div class="rite-hint">Tap runes to spell a rite — record what it does in your <b>Notebook</b>.</div>`;
 
-    // lighting a candle does NOT rebuild (so the rune can fade); updateLive syncs the classes
-    body.querySelectorAll('[data-candle]').forEach(b => b.addEventListener('click', () => { Game.toggleCandle(+b.dataset.candle); Game.save(); }));
+    body.querySelectorAll('[data-candle]').forEach(b => b.addEventListener('click', () => { Game.toggleCandle(+b.dataset.candle); act(true); }));
     body.querySelectorAll('[data-rune]').forEach(b => b.addEventListener('click', () => {
       const res = Game.tapRune(b.dataset.rune);
       if (res && res.cast) toast('The runes flare, then the circle goes dark.');
@@ -487,17 +487,6 @@ const UI = (() => {
       const pend = Game.pendingPrestige();
       const pp = el('pPend'); if (pp) pp.textContent = '+' + pend;
       const pb = el('prestigeBtn'); if (pb) pb.classList.toggle('disabled', pend < 1);
-    }
-    // ritual candles + runes fade in/out with their lit state
-    if (Game.ritualUnlocked()) {
-      G().candles.forEach((c, i) => {
-        const ce = document.querySelector(`.corner.candle[data-candle="${i}"]`);
-        if (ce) ce.classList.toggle('lit', c.lit);
-      });
-      Game.RUNES.forEach((r, i) => {
-        const re = document.querySelector(`.slate-rune[data-rune="${r.id}"]`);
-        if (re) re.classList.toggle('shown', Game.runeShown(i));
-      });
     }
     // daily quest live bits
     if (Game.dailyActive()) {
