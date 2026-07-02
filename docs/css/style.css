@@ -371,6 +371,35 @@ body { display: flex; justify-content: center; min-height: 100vh; }
   .event-log { height: 150px; }
 }
 
+/* ---------- settings modal ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(0,0,0,.65); display: flex; align-items: flex-start; justify-content: center;
+  padding: 40px 14px; overflow-y: auto;
+}
+.modal-card {
+  width: 100%; max-width: 440px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 18px; padding: 18px;
+}
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.set-section { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.set-title { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+.set-foot { color: var(--muted); font-size: 12px; text-align: center; padding-top: 12px; }
+.btn.danger { background: #3a1d1d; color: #e58f8f; width: 100%; }
+
+.dev-toggle { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; cursor: pointer; }
+.dev-toggle input { width: 20px; height: 20px; }
+.dev-panel { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.dev-row { display: flex; align-items: center; gap: 8px; }
+.dev-label { width: 92px; font-size: 13px; color: var(--muted); flex-shrink: 0; }
+.dev-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.dev-b { background: var(--card-2); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 6px 9px; font-size: 13px; cursor: pointer; }
+.dev-b:active { background: var(--btn); }
+
+.patch { margin-bottom: 14px; }
+.patch-head { font-size: 15px; margin-bottom: 4px; }
+.patch-list { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+
 /* ---------- prestige ---------- */
 .prestige-stat { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 16px; }
 .prestige-stat b { font-size: 20px; }

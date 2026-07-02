@@ -19,16 +19,9 @@ const UI = (() => {
     el('buyUp').addEventListener('click', () => { buyPage = Math.max(0, buyPage - 1); forceRebuild(); render(); });
     el('buyDown').addEventListener('click', () => { buyPage = Math.min(maxBuyPage(), buyPage + 1); forceRebuild(); render(); });
     el('speedBtn').addEventListener('click', () => { Game.cycleSpeed(); Game.save(); forceRebuild(); render(); });
-    el('menuBtn').addEventListener('click', e => { e.stopPropagation(); el('menu').classList.toggle('open'); });
-    document.addEventListener('click', e => {
-      if (!el('menu').contains(e.target) && e.target !== el('menuBtn')) el('menu').classList.remove('open');
-    });
-    el('menuReset').addEventListener('click', () => {
-      if (confirm('Abandon the cult and start over? All progress will be lost.')) {
-        Game.reset(); activeTab = 'home'; buyPage = 0; forceRebuild(); render();
-      }
-      el('menu').classList.remove('open');
-    });
+    el('menuBtn').addEventListener('click', openSettings);
+    el('settingsClose').addEventListener('click', () => el('settings').style.display = 'none');
+    el('settings').addEventListener('click', e => { if (e.target === el('settings')) el('settings').style.display = 'none'; });
     el('tabbar').addEventListener('click', e => {
       const b = e.target.closest('[data-tab]');
       if (!b || !Game.tabUnlocked(b.dataset.tab)) return;
@@ -477,6 +470,62 @@ const UI = (() => {
         b.classList.toggle('cant', !ok);
       });
     }
+  }
+
+  /* ---------- SETTINGS ---------- */
+  function openSettings() { renderSettings(); el('settings').style.display = 'flex'; }
+
+  const DEV_ROWS = [
+    { kind: 'cash',     label: '$',            amts: [10, 100, 1000, 1000000], money: true },
+    { kind: 'mana',     label: '✦ mana',       amts: [10, 100, 1000, 1000000] },
+    { kind: 'prestige', label: 'Prestige pts', amts: [10, 100, 1000, 1000000] },
+    { kind: 'cashloot', label: '$ loot %',     amts: [10, 50, 100, 1000] },
+    { kind: 'manaloot', label: '✦ loot %',     amts: [10, 50, 100, 1000] },
+    { kind: 'hp',       label: 'HP',           amts: [1, 10, 50, 100, 1000] },
+  ];
+
+  function renderSettings() {
+    const dev = Game.devMode();
+    let devCheats = '';
+    if (dev) {
+      devCheats = DEV_ROWS.map(r => `
+        <div class="dev-row"><span class="dev-label">${r.label}</span>
+          <span class="dev-btns">${r.amts.map(a => `<button class="dev-b" data-dev="${r.kind}" data-amt="${a}" data-money="${r.money ? 1 : 0}">+${a >= 1000000 ? (a / 1000000) + 'M' : a}</button>`).join('')}</span>
+        </div>`).join('');
+      devCheats = `<div class="dev-panel">${devCheats}</div>`;
+    }
+
+    const notes = Game.PATCH_NOTES.map(p => `
+      <div class="patch">
+        <div class="patch-head"><b>v${p.v}</b> — ${p.title}</div>
+        <ul class="patch-list">${p.items.map(i => `<li>${i}</li>`).join('')}</ul>
+      </div>`).join('');
+
+    el('settingsBody').innerHTML = `
+      <div class="set-section">
+        <label class="dev-toggle"><input type="checkbox" id="devChk" ${dev ? 'checked' : ''}/> Dev Panel</label>
+        ${devCheats}
+      </div>
+      <div class="set-section">
+        <button class="btn danger" id="resetBtn">Abandon &amp; reset everything</button>
+      </div>
+      <div class="set-section">
+        <div class="set-title">Patch notes</div>
+        ${notes}
+      </div>
+      <div class="set-foot">Idle Cult · progress auto-saves to this browser</div>`;
+
+    el('devChk').addEventListener('change', e => { Game.setDevMode(e.target.checked); renderSettings(); });
+    el('resetBtn').addEventListener('click', () => {
+      if (confirm('Abandon the cult and start over? All progress will be lost.')) {
+        Game.reset(); activeTab = 'home'; buyPage = 0; el('settings').style.display = 'none'; forceRebuild(); render();
+      }
+    });
+    el('settingsBody').querySelectorAll('[data-dev]').forEach(b => b.addEventListener('click', () => {
+      let amt = +b.dataset.amt;
+      if (b.dataset.money === '1') amt *= 100;   // dollars → cents
+      Game.devGive(b.dataset.dev, amt); forceRebuild(); render();
+    }));
   }
 
   function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }

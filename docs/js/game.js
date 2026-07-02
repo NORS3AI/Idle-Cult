@@ -68,7 +68,7 @@ const Game = (() => {
   /* ---------- combat stats ---------- */
   function incHp(i) { return i < 2 ? 1 : i; }              // +1,+1,+2,+3,+4,+5,+6,…
   function hpAdded() { let s = 0; for (let i = 0; i < (state.hpBought || 0); i++) s += incHp(i); return s; }
-  function maxHp() { return CONFIG.baseHp + hpAdded(); }
+  function maxHp() { return CONFIG.baseHp + hpAdded() + (state.hpBonus || 0); }
   function cashLootPct() { return (state.cashLootBought || 0) * 0.01; }
   function manaLootPct() { return (state.manaLootBought || 0) * 0.01; }
   function stepDollars(bought) {
@@ -111,7 +111,8 @@ const Game = (() => {
     return 1 + (state.prestigePoints || 0) * CONFIG.prestigeSpeedPer + (has('thurible') ? CONFIG.thuribleHaste : 0);
   }
   function effGrow(seed) { return seed.grow / growthSpeed(); }
-  function speed() { return state.gameSpeed || 1; }    // game-speed multiplier ×1…×5
+  function speed() { return state.gameSpeed || 1; }        // selector level ×1…×10
+  function speedFactor() { return Math.pow(2, speed() - 1); } // each level halves time (×1→1, ×5→16, ×10→512)
   function cycleSpeed() { state.gameSpeed = (speed() % CONFIG.maxSpeed) + 1; return state.gameSpeed; }
   function manaMax() { return CONFIG.manaMax; }
   function manaRegenPerSec() { return CONFIG.manaRegenPerHour / 3600; }
@@ -160,6 +161,8 @@ const Game = (() => {
       trinkets: [],
       prestigePoints: 0,
       prestigeUnlocked: false,
+      hpBonus: 0,
+      devMode: false,
       lastTick: now(),
     };
   }
@@ -198,7 +201,7 @@ const Game = (() => {
   }
   function timeLeft(p) {                                // real seconds left at current speed
     if (!p.seed) return 0;
-    return Math.max(0, (effGrow(SEEDS_BY_ID[p.seed]) - p.prog) / speed());
+    return Math.max(0, (effGrow(SEEDS_BY_ID[p.seed]) - p.prog) / speedFactor());
   }
   function sell(planterIndex) {
     const p = state.planters[planterIndex];
@@ -391,7 +394,7 @@ const Game = (() => {
     if (dt <= 0) { state.lastTick = t; return; }
     if (dt > 10) { applyOffline(); return; } // a real gap (sleep/close) → real-time offline path
     state.lastTick = t;
-    const sdt = dt * speed();             // sped-up game seconds this frame
+    const sdt = dt * speedFactor();       // sped-up game seconds this frame
     state.mana += manaRegenPerSec() * sdt;
     const inc = ledgerPerSec(false) * sdt; if (inc > 0) earn(inc);
     const auto = autoHarvest();
@@ -465,8 +468,9 @@ const Game = (() => {
         if (!Array.isArray(state.discovered)) state.discovered = [];
         if (!state.notes || typeof state.notes !== 'object') state.notes = {};
         if (!Array.isArray(state.trinkets)) state.trinkets = [];
-        ['hpBought', 'cashLootBought', 'manaLootBought', 'prestigePoints'].forEach(k => { if (typeof state[k] !== 'number') state[k] = 0; });
+        ['hpBought', 'cashLootBought', 'manaLootBought', 'prestigePoints', 'hpBonus'].forEach(k => { if (typeof state[k] !== 'number') state[k] = 0; });
         if (typeof state.prestigeUnlocked !== 'boolean') state.prestigeUnlocked = false;
+        if (typeof state.devMode !== 'boolean') state.devMode = false;
         if (state.combat === undefined) state.combat = null;
         if (!(state.gameSpeed >= 1 && state.gameSpeed <= CONFIG.maxSpeed)) state.gameSpeed = 1;
         if (!Array.isArray(state.planters) || !state.planters.length) state.planters = [makePlanter()];
@@ -490,11 +494,25 @@ const Game = (() => {
   function reset() { state = freshState(); save(); }
   function setNote(spellId, text) { state.notes[spellId] = text; }
 
+  /* ---------- dev panel ---------- */
+  function setDevMode(on) { state.devMode = !!on; save(); }
+  function devMode() { return !!state.devMode; }
+  function devGive(kind, amount) {
+    if (kind === 'cash') { state.cents += amount; state.totalEarned += amount; checkUnlocks(); }
+    else if (kind === 'mana') state.mana += amount;
+    else if (kind === 'prestige') { state.prestigePoints = (state.prestigePoints || 0) + amount; state.prestigeUnlocked = true; }
+    else if (kind === 'cashloot') state.cashLootBought = (state.cashLootBought || 0) + amount;
+    else if (kind === 'manaloot') state.manaLootBought = (state.manaLootBought || 0) + amount;
+    else if (kind === 'hp') state.hpBonus = (state.hpBonus || 0) + amount;
+    save();
+  }
+
   /* ---------- public API ---------- */
   return {
     get state() { return state; },
     fmtMoney, fmtTime, now,
-    multiplier, growthSpeed, effGrow, slotCount, speed, cycleSpeed,
+    multiplier, growthSpeed, effGrow, slotCount, speed, speedFactor, cycleSpeed,
+    setDevMode, devMode, devGive,
     manaRegenPerSec, ritualManaCost, has, tabUnlocked, avgPlantedSell, ledgerPerSec, autoHarvest,
     maxHp, hpAdded, cashLootPct, manaLootPct, fieldCost, fieldNextAmount,
     itemPrice, itemStockLeft, itemSoldOut, nextLockedSeed,
@@ -506,7 +524,7 @@ const Game = (() => {
     toggleCandle, setRune, cycleRune, setNote,
     isGrown, progress, timeLeft,
     tick, applyOffline, save, load, reset,
-    SEEDS, ITEMS, TABS, RUNES, SPELLS, AREAS, FIELD_UPGRADES, AREAS_BY_ID,
+    SEEDS, ITEMS, TABS, RUNES, SPELLS, AREAS, FIELD_UPGRADES, AREAS_BY_ID, PATCH_NOTES,
     SEEDS_BY_ID, ITEMS_BY_ID, RUNES_BY_ID, SPELLS_BY_ID, CONFIG,
   };
 })();
