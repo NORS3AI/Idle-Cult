@@ -202,6 +202,36 @@ const CONFIG = {
   manaRegenPerHour: 5,           // mana recharge rate
   candleFreeMana: 100,           // free mana granted when the 4th candle is set
   buyPageSize: 4,                // shop shows four upgrades at a time
-  maxSpeed: 5,                   // game-speed selector cycles ×1 … ×5
+  maxSpeed: 10,                  // game-speed selector cycles ×1 … ×10 (each step halves time)
   saveKey: 'idle-cult-save-v1',
 };
+
+/* Patch notes — newest first. Shown in Settings. */
+const PATCH_NOTES = [
+  { v: '0.8', title: 'Speed x10, prestige & Settings', items: [
+    'Game speed now goes up to ×10 — each step halves grow time (×1 radish 6s → ×5 ~0.4s → ×10 ~0.01s).',
+    'Prestige points give +1% plant speed each (100 pts = +100%).',
+    'New Settings panel with patch notes and an optional Dev Panel.',
+  ] },
+  { v: '0.7', title: 'Flat prices, new crops, item effects', items: [
+    'Planters ($2.22) and candles ($6.67) are flat-priced; up to 6 planters total.',
+    'New crop line: radish → cabbage → garlic → ginger → yarrow → mandrake → wormwood → belladonna.',
+    'Thurible +5% growth · brazier & ironwood upgrade the ward · poultice heals in combat · compass +50% expedition speed.',
+    'Prestige unlocks at $2,000 earned; auto-harvester now harvests & replants for 1 mana per crop.',
+  ] },
+  { v: '0.6', title: 'Combat expeditions', items: [
+    'Send expeditions into The Wald — a themed event log, hearts, loot and field upgrades.',
+    'Flee with loot anytime; dying loses the run. Mana moved to the top bar.',
+  ] },
+  { v: '0.5', title: 'Manual planting & rituals', items: [
+    'Planting is manual; the ⟳ button saves a spot for one-tap replanting.',
+    'Ritual slate: light four candles with one of each rune to cast a mana-fuelled rite (effect is yours to discover).',
+  ] },
+  { v: '0.4', title: 'Tabs & the shop', items: [
+    'Top tabs: Grove, Notebook, Combat, Research (each unlocked by its item).',
+    'Ledger passive income; shop paginates four at a time.',
+  ] },
+  { v: '0.1', title: 'The grove', items: [
+    'Grow crops, sell them, and buy your first upgrades. Auto-saves to your browser.',
+  ] },
+];

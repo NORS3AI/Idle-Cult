@@ -18,8 +18,9 @@ Progress auto-saves to your device and continues while you're away.
   *saves the spot*: it keeps the planter assigned to that crop so you can replant
   it with one tap. (It does **not** auto-plant; the **auto-harvester** upgrade is
   what auto-sells ripe crops.)
-- **Game speed** — the chip in the top bar (`×1`) cycles **×1…×5** to run the
-  whole grove faster.
+- **Game speed** — the chip in the top bar (`×1`) cycles **×1…×10**; each step
+  **halves** grow time (radish: 6s → 3s → 1.5s → … at ×10 ~0.01s).
+- **Settings** (⚙) — patch notes and an optional **Dev Panel** (resource cheats).
 - **Auto-harvester** ($2,500) auto-harvests **and** replants every planter for
   **1 mana per crop** (both actions); with no mana it waits.
 - **Prestige** (opens once you've earned $2,000): bank **+1 point per $50** earned,

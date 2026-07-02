@@ -30,13 +30,17 @@
       <span id="manaTop" class="mana-top">✦&nbsp;0</span>
       <div class="top-right">
         <button id="speedBtn" class="mult-chip" title="Game speed — tap to change">×<span id="mult">1</span></button>
-        <button id="menuBtn" class="menu-btn" aria-label="menu">⋯</button>
-      </div>
-      <div id="menu" class="menu">
-        <button id="menuReset">Abandon &amp; reset</button>
-        <div class="menu-note">Idle Cult · auto-saves to this browser</div>
+        <button id="menuBtn" class="menu-btn" aria-label="settings">⚙</button>
       </div>
     </header>
+
+    <!-- settings modal -->
+    <div id="settings" class="modal" style="display:none">
+      <div class="modal-card">
+        <div class="modal-head"><h2 class="card-title">Settings</h2><button id="settingsClose" class="menu-btn">✕</button></div>
+        <div id="settingsBody"></div>
+      </div>
+    </div>
 
     <!-- tab bar -->
     <nav id="tabbar" class="tabbar"></nav>
