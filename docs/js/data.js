@@ -301,6 +301,11 @@ const CONFIG = {
 
 /* Patch notes — newest first. Shown in Settings. */
 const PATCH_NOTES = [
+  { v: '1.5', title: 'Tuning & fixes', items: [
+    'Ritual runes are reliably tappable again — light the candles, then tap the runes.',
+    'Expedition speeds retuned: at ×10 the seven locations finish in 1 / 3 / 8 / 19 / 27 / 41 / 66 seconds.',
+    'The Void now pays out above its entry cost; economy numbers cleaned up.',
+  ] },
   { v: '1.4', title: 'Seven expeditions, trinkets & blood', items: [
     'Seven themed locations: The Dulling, Blacktide Bay, Mad Max\'s Cathedral, Windsor Castle, The Bright Court, The Forgotten Court, The Void.',
     'Each costs $ to enter and has its own risk, rewards, flavour and creatures. Higher speeds make runs "stupid fast" (÷512 at ×10).',
