@@ -6,22 +6,26 @@ const Game = (() => {
   let state = null;
 
   /* ---------- formatting helpers ---------- */
+  // suffix scale: every 1000×  (k, m, b, t, Qa, Qi, No, De, …)
+  const SUFFIXES = ['', 'k', 'm', 'b', 't', 'Qa', 'Qi', 'No', 'De', 'Ud', 'Dd', 'Td', 'Qad', 'Qid', 'SxD', 'SpD', 'OcD', 'NoD', 'Vg'];
   function fmtMoney(cents) {
     cents = Math.floor(cents);
     if (cents < 100) return cents + '¢';
     const d = cents / 100;
-    const trim = n => n.toFixed(2).replace(/\.?0+$/, '');
-    const suf = [[1e15, 'Q'], [1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']];
-    for (const [v, s] of suf) if (d >= v) return '$' + trim(d / v) + s;
-    return Number.isInteger(d) ? '$' + d : '$' + d.toFixed(2);
+    if (d < 1e6) return '$' + d.toLocaleString('en-US', { maximumFractionDigits: 2 });  // commas below a million
+    let i = Math.floor(Math.log10(d) / 3);
+    if (i >= SUFFIXES.length) i = SUFFIXES.length - 1;
+    const val = (d / Math.pow(1000, i)).toFixed(2).replace(/\.?0+$/, '');
+    return '$' + val + SUFFIXES[i];
   }
   function fmtTime(s) {
     s = Math.max(0, Math.ceil(s));
     if (s < 60) return s + 's';
-    const m = Math.floor(s / 60), r = s % 60;
-    if (m < 60) return r ? m + 'm ' + r + 's' : m + 'm';
-    const h = Math.floor(m / 60), rm = m % 60;
-    return rm ? h + 'h ' + rm + 'm' : h + 'h';
+    if (s < 3600) { const m = Math.floor(s / 60), r = s % 60; return r ? m + 'm ' + r + 's' : m + 'm'; }
+    if (s < 172800) { const h = Math.floor(s / 3600), rm = Math.floor((s % 3600) / 60); return rm ? h + 'h ' + rm + 'm' : h + 'h'; } // < 48h
+    if (s < 31536000) { const d = Math.floor(s / 86400), rh = Math.floor((s % 86400) / 3600); return rh ? d + 'd ' + rh + 'h' : d + 'd'; }
+    const y = Math.floor(s / 31536000), rd = Math.floor((s % 31536000) / 86400);
+    return rd ? y + 'y ' + rd + 'd' : y + 'y';
   }
   function now() { return Date.now(); }
 
