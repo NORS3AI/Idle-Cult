@@ -47,10 +47,8 @@ const UI = (() => {
       s.unlockedSeeds.join(','),
       JSON.stringify(s.items),
       Game.ritualUnlocked(),
-      s.candles.slice(0, 4).map(c => c.lit ? 'L' : 'd').join(''),
       Game.runeSeqStr(),
       (s.discovered || []).join(','),
-      JSON.stringify(s.autoCast || {}),
       s.planters.map(p => (p.seed || ('_' + (p.lastSeed || ''))) + (p.repeat ? 'R' : '')).join('|'),
       // combat
       s.combat ? s.combat.status + s.combat.log.length : 'nocombat',
@@ -221,33 +219,30 @@ const UI = (() => {
 
     const count = Game.candleCount();
     const corners = ['tl', 'tr', 'bl', 'br'];
-    let cornersHtml = '';
+    let cornersHtml = '', runesHtml = '';
     for (let i = 0; i < Game.CONFIG.candleCount; i++) {
       if (i >= count) { cornersHtml += `<div class="corner ${corners[i]} holder"><span class="holder-dot">·</span></div>`; continue; }
-      const c = G().candles[i];
+      const c = G().candles[i], r = Game.RUNES[i];
       cornersHtml += `<div class="corner ${corners[i]} candle ${c.lit ? 'lit' : ''}" data-candle="${i}">
           <div class="flame"></div><div class="candle-body"></div></div>`;
+      // each candle reveals its rune; the rune fades in/out with the candle's lit state
+      runesHtml += `<button class="slate-rune pos-${r.pos} ${c.lit ? 'shown' : ''}" data-rune="${r.id}" title="${r.letter}">${r.sym}</button>`;
     }
-
-    const lit = Game.allCandlesLit();
-    let runesHtml = '';
-    if (lit) runesHtml = Game.RUNES.map(r =>
-      `<button class="slate-rune pos-${r.pos}" data-rune="${r.id}" title="${r.letter}">${r.sym}</button>`).join('');
 
     const seq = Game.runeSeqStr();
-    let seqHtml = '';
-    if (lit && seq.length) {
-      seqHtml = `<div class="rune-seq">${seq.split('').map(l => `<span class="seq-rune">${Game.RUNES_BY_ID[l].sym}</span>`).join('')}<button class="seq-x" data-seqx="1">✕</button></div>`;
-    }
+    const seqHtml = seq.length
+      ? `<div class="rune-seq">${seq.split('').map(l => `<span class="seq-rune">${Game.RUNES_BY_ID[l].sym}</span>`).join('')}<button class="seq-x" data-seqx="1">✕</button></div>`
+      : '';
 
     let hint = '';
     if (count < Game.CONFIG.candleCount) { const n = Game.CONFIG.candleCount - count; hint = `<div class="slate-hint">Set ${n} more candle${n > 1 ? 's' : ''} from the shop.</div>`; }
-    else if (!lit) hint = `<div class="slate-hint">Tap each candle to light it.</div>`;
+    else if (!Game.allCandlesLit()) hint = `<div class="slate-hint">Tap each candle to light its rune.</div>`;
 
     body.innerHTML = `<div class="slate">${seqHtml}${cornersHtml}${runesHtml}${hint}</div>
       <div class="rite-hint">Tap runes to spell a rite — record what it does in your <b>Notebook</b>.</div>`;
 
-    body.querySelectorAll('[data-candle]').forEach(b => b.addEventListener('click', () => { Game.toggleCandle(+b.dataset.candle); act(true); }));
+    // lighting a candle does NOT rebuild (so the rune can fade); updateLive syncs the classes
+    body.querySelectorAll('[data-candle]').forEach(b => b.addEventListener('click', () => { Game.toggleCandle(+b.dataset.candle); Game.save(); }));
     body.querySelectorAll('[data-rune]').forEach(b => b.addEventListener('click', () => {
       const res = Game.tapRune(b.dataset.rune);
       if (res && res.cast) toast('The runes flare, then the circle goes dark.');
@@ -270,8 +265,7 @@ const UI = (() => {
       const sp = Game.SPELLS_BY_ID[id];
       const pat = sp.seq.map(l => `<span class="mini-rune">${Game.RUNES_BY_ID[l].sym}</span>`).join('');
       const note = (G().notes && G().notes[id]) ? G().notes[id] : '';
-      const on = G().autoCast && G().autoCast[id];
-      const castBtn = auto ? `<button class="btn nb-cast ${on ? 'primary' : ''}" data-auto="${id}">${on ? 'Casting' : 'Cast'}</button>` : '';
+      const castBtn = auto ? `<button class="btn primary nb-cast" data-cast="${id}">Cast</button>` : '';
       return `<div class="nb-spell">
           <div class="nb-head">${castBtn}<div class="spell-pat">${pat}</div><div class="nb-mana">✦ ${sp.mana}</div></div>
           <textarea class="nb-notes" maxlength="255" data-note="${id}" placeholder="Your notes…">${escapeHtml(note)}</textarea>
@@ -279,7 +273,12 @@ const UI = (() => {
     }).join('');
     body.innerHTML = html;
     body.querySelectorAll('[data-note]').forEach(t => t.addEventListener('input', () => { Game.setNote(t.dataset.note, t.value.slice(0, 255)); Game.save(); }));
-    body.querySelectorAll('[data-auto]').forEach(b => b.addEventListener('click', () => { Game.toggleAutoCast(b.dataset.auto); act(true); }));
+    body.querySelectorAll('[data-cast]').forEach(b => b.addEventListener('click', () => {
+      const id = b.dataset.cast, sp = Game.SPELLS_BY_ID[id];
+      if (Game.castSpellById(id)) toast(`Cast — <b>✦${sp.mana}</b> spent.`);
+      else toast('Not enough mana.');
+      Game.save(); renderTop();
+    }));
   }
 
   /* ---------- COMBAT ---------- */
@@ -450,6 +449,17 @@ const UI = (() => {
       const pp = el('pPend'); if (pp) pp.textContent = '+' + pend;
       const pb = el('prestigeBtn'); if (pb) pb.classList.toggle('disabled', pend < 1);
     }
+    // ritual candles + runes fade in/out with their lit state
+    if (Game.ritualUnlocked()) {
+      G().candles.forEach((c, i) => {
+        const ce = document.querySelector(`.corner.candle[data-candle="${i}"]`);
+        if (ce) ce.classList.toggle('lit', c.lit);
+      });
+      Game.RUNES.forEach((r, i) => {
+        const re = document.querySelector(`.slate-rune[data-rune="${r.id}"]`);
+        if (re) re.classList.toggle('shown', Game.runeShown(i));
+      });
+    }
     // daily quest live bits
     if (Game.dailyActive()) {
       const qt = el('qtimer'); if (qt) qt.textContent = 'Resets in ' + Game.fmtTime(Game.dailyTimeLeft());
@@ -532,7 +542,12 @@ const UI = (() => {
         ${devCheats}
       </div>
       <div class="set-section">
-        <button class="btn danger" id="resetBtn">Abandon &amp; reset everything</button>
+        <button class="btn danger" id="wipeBtn">Wipe Save</button>
+        <div id="wipeConfirm" class="wipe-confirm" style="display:none">
+          <span>Are you sure :(</span>
+          <button class="btn danger" id="wipeYes">Yes</button>
+          <button class="btn" id="wipeNo">No</button>
+        </div>
       </div>
       <div class="set-section">
         <div class="set-title">Patch notes</div>
@@ -541,10 +556,16 @@ const UI = (() => {
       <div class="set-foot">Idle Cult · progress auto-saves to this browser</div>`;
 
     el('devChk').addEventListener('change', e => { Game.setDevMode(e.target.checked); renderSettings(); });
-    el('resetBtn').addEventListener('click', () => {
-      if (confirm('Abandon the cult and start over? All progress will be lost.')) {
-        Game.reset(); activeTab = 'home'; buyPage = 0; el('settings').style.display = 'none'; forceRebuild(); render();
-      }
+    el('wipeBtn').addEventListener('click', () => {
+      el('wipeBtn').style.display = 'none';
+      el('wipeConfirm').style.display = 'flex';
+    });
+    el('wipeNo').addEventListener('click', () => {          // cancel
+      el('wipeConfirm').style.display = 'none';
+      el('wipeBtn').style.display = 'block';
+    });
+    el('wipeYes').addEventListener('click', () => {         // hard delete the save
+      Game.wipe(); activeTab = 'home'; buyPage = 0; el('settings').style.display = 'none'; forceRebuild(); render();
     });
     el('settingsBody').querySelectorAll('[data-dev]').forEach(b => b.addEventListener('click', () => {
       let amt = +b.dataset.amt;
