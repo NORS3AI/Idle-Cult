@@ -104,12 +104,12 @@ const SPELLS = [
 const SPELLS_BY_ID = Object.fromEntries(SPELLS.map(s => [s.id, s]));
 
 /* Top navigation tabs. Each (except home) unlocks when its item is owned. */
+// Top tabs are only Grove / Combat / Research. Notebook, Prestige and Daily
+// Quests live as cards on the Grove dashboard.
 const TABS = [
   { id: 'home',     icon: '⌂', label: 'Grove',    needs: null },
-  { id: 'notebook', icon: '✒', label: 'Notebook', needs: 'notebook' },
   { id: 'combat',   icon: '⚔', label: 'Combat',   needs: 'map' },
   { id: 'research', icon: '⚗', label: 'Research', needs: 'research' },
-  { id: 'prestige', icon: '☥', label: 'Prestige', needs: '@prestige' }, // special: unlocked by earnings
 ];
 
 /* ----- Combat / expeditions ----- */
@@ -218,6 +218,12 @@ const CONFIG = {
 
 /* Patch notes — newest first. Shown in Settings. */
 const PATCH_NOTES = [
+  { v: '1.1', title: 'Dashboard layout & Notebook', items: [
+    'Grove is now a two-column dashboard: Upgrades / Planters / Prestige / Daily quests on the left; Seeds / Ritual slate / Notebook on the right.',
+    'Top tabs are just Grove / Combat / Research; the clock sits top-left with speed and settings top-right.',
+    '"Buy" renamed to "Upgrades".',
+    'Notebook shows each discovered rite with its mana cost and a 255-character note field; with Auto-Ritual, a Cast button auto-performs it.',
+  ] },
   { v: '1.0', title: 'Rune rites & Auto-Ritual', items: [
     'Ritual slate remade: light the four candles, then tap Norse runes (F/D/S/A) to spell a rite.',
     'The sequence shows at the top with an ✕ to clear; it also auto-clears after 20s.',
