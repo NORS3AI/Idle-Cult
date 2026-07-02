@@ -59,6 +59,8 @@ const UI = (() => {
       // prestige (pending only forces rebuilds while its tab is open)
       Game.prestigeUnlocked(), Game.prestigePoints(),
       activeTab === 'prestige' ? Game.pendingPrestige() : 0,
+      // daily quests
+      Game.dailyActive(), (s.questClaimed || []).join(''), s.hasPrestiged,
     ].join(';');
   }
 
@@ -70,17 +72,45 @@ const UI = (() => {
     const mt = el('manaTop');
     mt.innerHTML = '✦&nbsp;' + Math.floor(G().mana);
     mt.style.display = (Game.ritualUnlocked() || Game.has('auto-harvester') || G().mana > 0) ? 'inline-flex' : 'none';
+    const sc = el('scrollsTop');
+    sc.innerHTML = '📜&nbsp;' + (G().scrolls || 0);
+    sc.style.display = (G().hasPrestiged || (G().scrolls || 0) > 0) ? 'inline-flex' : 'none';
   }
   function renderTabs() {
     if (!Game.tabUnlocked(activeTab)) activeTab = 'home';
     el('tabbar').innerHTML = Game.TABS.filter(t => Game.tabUnlocked(t.id)).map(t =>
-      `<button class="tab ${t.id === activeTab ? 'active' : ''}" data-tab="${t.id}" title="${t.label}">
-         <span class="tab-icon">${t.icon}</span><span class="tab-label">${t.label}</span>
+      `<button class="tab ${t.id === activeTab ? 'active' : ''}" data-tab="${t.id}" title="${t.label}" aria-label="${t.label}">
+         <span class="tab-icon">${t.icon}</span>
        </button>`).join('');
   }
   function showView() {
     ['home', 'notebook', 'combat', 'research', 'prestige'].forEach(v =>
       el('view-' + v).style.display = (v === activeTab ? 'block' : 'none'));
+  }
+
+  /* ---------- DAILY QUESTS ---------- */
+  function renderDaily() {
+    const card = el('dailyCard'), body = el('dailyBody');
+    if (!Game.dailyActive()) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    const rows = Game.DAILY_QUESTS.map((q, i) => {
+      const prog = Game.questProgress(i), claimed = G().questClaimed[i];
+      const btn = claimed
+        ? `<button class="btn q-done" disabled>✓</button>`
+        : `<button class="btn ${Game.questClaimable(i) ? 'primary' : 'disabled'}" data-claim="${i}">Claim</button>`;
+      return `<div class="q-row">
+          <div class="q-reward">📜 ${q.reward}</div>
+          <div class="q-main">
+            <div class="q-count time-q${i}">${prog} / ${q.target}</div>
+            ${bar(prog / q.target, 'q qbar-' + i)}
+          </div>
+          ${btn}
+        </div>`;
+    }).join('');
+    body.innerHTML = `<div class="q-sub">Harvest plants to earn 📜 · <span id="qtimer">Resets in ${Game.fmtTime(Game.dailyTimeLeft())}</span></div>${rows}`;
+    body.querySelectorAll('[data-claim]').forEach(b => b.addEventListener('click', () => {
+      if (Game.claimQuest(+b.dataset.claim)) { toast('Claimed <b>📜 1</b>.'); act(true); }
+    }));
   }
 
   /* ---------- BUY (paginated, four at a time) ---------- */
@@ -417,7 +447,7 @@ const UI = (() => {
     const sig = structuralSig();
     if (sig !== lastSig) {
       renderTabs(); showView();
-      if (activeTab === 'home') { renderBuy(); renderSeeds(); renderPlanters(); renderRitual(); }
+      if (activeTab === 'home') { renderDaily(); renderBuy(); renderSeeds(); renderPlanters(); renderRitual(); }
       else if (activeTab === 'notebook') renderNotebook();
       else if (activeTab === 'combat') renderCombat();
       else if (activeTab === 'research') renderResearch();
@@ -436,6 +466,16 @@ const UI = (() => {
 
     if (activeTab === 'combat') { updateCombatLive(); return; }
     if (activeTab !== 'home') return;
+    // daily quest live bits
+    if (Game.dailyActive()) {
+      const qt = el('qtimer'); if (qt) qt.textContent = 'Resets in ' + Game.fmtTime(Game.dailyTimeLeft());
+      Game.DAILY_QUESTS.forEach((q, i) => {
+        const prog = Game.questProgress(i);
+        const cnt = document.querySelector('.time-q' + i); if (cnt) cnt.textContent = prog + ' / ' + q.target;
+        const bf = document.querySelector('.qbar-' + i + ' .bar-fill'); if (bf) bf.style.width = Math.min(100, prog / q.target * 100) + '%';
+        const cb = document.querySelector('[data-claim="' + i + '"]'); if (cb && !G().questClaimed[i]) cb.classList.toggle('disabled', !Game.questClaimable(i));
+      });
+    }
     G().planters.forEach((p, i) => {
       const fill = document.querySelector(`.row.planter[data-i="${i}"] .bar-fill`);
       if (p.seed && fill) {
@@ -482,6 +522,7 @@ const UI = (() => {
     { kind: 'cashloot', label: '$ loot %',     amts: [10, 50, 100, 1000] },
     { kind: 'manaloot', label: '✦ loot %',     amts: [10, 50, 100, 1000] },
     { kind: 'hp',       label: 'HP',           amts: [1, 10, 50, 100, 1000] },
+    { kind: 'scrolls',  label: '📜 scrolls',   amts: [1, 10, 100, 1000] },
   ];
 
   function renderSettings() {

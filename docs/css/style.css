@@ -49,22 +49,21 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 .sb-right { display: flex; gap: 7px; align-items: center; font-size: 13px; color: var(--text); }
 .sb-batt { border: 1px solid #555; border-radius: 4px; padding: 0 3px; font-size: 11px; }
 
-/* ---------- top bar ---------- */
+/* ---------- top bar (single row: tabs · money/mana/scrolls · title/speed/settings) ---------- */
 .topbar {
-  display: flex; align-items: center; gap: 12px;
-  padding: 8px 18px 14px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px 10px;
   position: sticky; top: 0; z-index: 30;
-  background: linear-gradient(var(--bg) 78%, transparent);
+  background: var(--bg); border-bottom: 1px solid var(--line);
+  overflow-x: auto;
 }
-.home-btn {
-  width: 42px; height: 42px; border-radius: 12px;
-  background: var(--card-2); border: 1px solid var(--line);
-  color: var(--text); font-size: 20px; line-height: 1; cursor: pointer;
-}
-.money-wrap { display: flex; flex-direction: column; line-height: 1.05; }
-.money { font-size: 26px; font-weight: 700; letter-spacing: .5px; }
-.rate { display: none; font-size: 12px; color: var(--good); font-weight: 600; margin-top: 2px; }
-.top-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.money { font-size: 20px; font-weight: 700; letter-spacing: .3px; white-space: nowrap; }
+.hud { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.scrolls-top { display: none; align-items: center; font-size: 15px; font-weight: 700; color: #d8c79a; white-space: nowrap; }
+.rate { display: none; font-size: 11px; color: var(--good); font-weight: 600; }
+.game-title { font-family: Georgia, "Times New Roman", serif; font-size: 15px; color: var(--muted); white-space: nowrap; }
+.top-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+@media (max-width: 430px) { .game-title { display: none; } }
 .mult-chip {
   font-size: 17px; font-weight: 700; color: var(--text);
   background: var(--card-2); border: 1px solid var(--line);
@@ -72,8 +71,8 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 }
 .mult-chip.fast { color: var(--flame); border-color: rgba(255,160,60,.5); background: #221a12; }
 .mana-top {
-  display: inline-flex; align-items: center; font-size: 16px; font-weight: 700;
-  color: #7db0e8; margin-left: 10px; white-space: nowrap;
+  display: inline-flex; align-items: center; font-size: 15px; font-weight: 700;
+  color: #7db0e8; white-space: nowrap;
 }
 .haste-badge {
   display: none; align-items: center; gap: 2px;
@@ -97,20 +96,16 @@ body { display: flex; justify-content: center; min-height: 100vh; }
 .menu button:hover { background: var(--row); }
 .menu-note { color: var(--muted); font-size: 12px; padding: 6px 10px 2px; }
 
-/* ---------- tab bar (static, anchored top-left; scrolls away with content) ---------- */
-.tabbar {
-  display: flex; gap: 8px; padding: 2px 16px 12px;
-  justify-content: flex-start;
-}
+/* ---------- tab bar (inline icons in the top bar) ---------- */
+.tabbar { display: flex; gap: 5px; flex-shrink: 0; }
 .tab {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  min-width: 58px;
-  background: var(--card-2); border: 1px solid var(--line); border-radius: 14px;
-  color: var(--muted); padding: 8px 10px; cursor: pointer; transition: all .15s;
+  display: flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px;
+  background: transparent; border: 1px solid transparent; border-radius: 10px;
+  color: var(--muted); cursor: pointer; transition: all .15s;
 }
-.tab.active { color: var(--text); border-color: var(--accent); background: #221f18; }
-.tab-icon { font-size: 20px; line-height: 1; }
-.tab-label { font-size: 11px; font-weight: 600; }
+.tab.active { color: var(--text); background: var(--card-2); border-color: var(--line); }
+.tab-icon { font-size: 19px; line-height: 1; }
 
 /* info button */
 .info-btn {
@@ -370,6 +365,16 @@ body { display: flex; justify-content: center; min-height: 100vh; }
   .combat-cols { flex-direction: column; }
   .event-log { height: 150px; }
 }
+
+/* ---------- daily quests ---------- */
+.q-sub { color: var(--muted); font-size: 14px; margin: 2px 0 14px; }
+.q-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.q-reward { font-size: 15px; font-weight: 700; color: #d8c79a; min-width: 44px; white-space: nowrap; }
+.q-main { flex: 1; min-width: 0; }
+.q-count { text-align: right; font-size: 16px; font-weight: 700; }
+.bar.q { margin-top: 6px; }
+.bar.q .bar-fill { background: #efeae0; }
+.btn.q-done { background: transparent; border: 1px solid var(--line); color: var(--good); min-width: 66px; }
 
 /* ---------- settings modal ---------- */
 .modal {

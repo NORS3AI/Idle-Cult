@@ -23,12 +23,15 @@
 
     <!-- header -->
     <header class="topbar">
-      <div class="money-wrap">
-        <div id="money" class="money">10¢</div>
-        <div id="rate" class="rate"></div>
+      <nav id="tabbar" class="tabbar"></nav>
+      <div class="hud">
+        <span id="money" class="money">10¢</span>
+        <span id="manaTop" class="mana-top">✦&nbsp;0</span>
+        <span id="scrollsTop" class="scrolls-top">📜&nbsp;0</span>
+        <span id="rate" class="rate"></span>
       </div>
-      <span id="manaTop" class="mana-top">✦&nbsp;0</span>
       <div class="top-right">
+        <span class="game-title">Idle&nbsp;Cult</span>
         <button id="speedBtn" class="mult-chip" title="Game speed — tap to change">×<span id="mult">1</span></button>
         <button id="menuBtn" class="menu-btn" aria-label="settings">⚙</button>
       </div>
@@ -42,12 +45,14 @@
       </div>
     </div>
 
-    <!-- tab bar -->
-    <nav id="tabbar" class="tabbar"></nav>
-
     <main class="content">
       <!-- HOME (Grove) -->
       <div id="view-home" class="view">
+        <section id="dailyCard" class="card daily" style="display:none">
+          <h2 class="card-title">Daily quest</h2>
+          <div id="dailyBody"></div>
+        </section>
+
         <section class="card">
           <h2 class="card-title">Buy</h2>
           <button id="buyUp" class="collapse-bar" aria-label="previous upgrades">⌃</button>

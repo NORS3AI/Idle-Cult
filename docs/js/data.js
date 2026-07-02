@@ -174,6 +174,15 @@ const AREAS = [
 ];
 const AREAS_BY_ID = Object.fromEntries(AREAS.map(a => [a.id, a]));
 
+/* Daily quests — unlocked after the first prestige, reset every hour.
+   Harvest plants to hit each tier, then Claim its scroll reward. */
+const DAILY_QUESTS = [
+  { target: 6,   reward: 1 },
+  { target: 30,  reward: 1 },
+  { target: 120, reward: 1 },
+  { target: 360, reward: 1 },
+];
+
 const CONFIG = {
   startCents: 10,
   ledgerRate: 0.04,              // 4% of average planted crop value per second
@@ -203,11 +212,17 @@ const CONFIG = {
   candleFreeMana: 100,           // free mana granted when the 4th candle is set
   buyPageSize: 4,                // shop shows four upgrades at a time
   maxSpeed: 10,                  // game-speed selector cycles ×1 … ×10 (each step halves time)
+  dailyResetSeconds: 3600,       // daily quests refresh every hour
   saveKey: 'idle-cult-save-v1',
 };
 
 /* Patch notes — newest first. Shown in Settings. */
 const PATCH_NOTES = [
+  { v: '0.9', title: 'Daily quests & scrolls', items: [
+    'Daily quests appear after your first prestige — harvest plants to claim 📜 scrolls; they reset every hour.',
+    'New Scrolls resource shown in the top bar next to cash and mana.',
+    'Top bar remade: location tabs, cash, mana and scrolls all in one row.',
+  ] },
   { v: '0.8', title: 'Speed x10, prestige & Settings', items: [
     'Game speed now goes up to ×10 — each step halves grow time (×1 radish 6s → ×5 ~0.4s → ×10 ~0.01s).',
     'Prestige points give +1% plant speed each (100 pts = +100%).',
