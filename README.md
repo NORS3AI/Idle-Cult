@@ -20,6 +20,10 @@ Progress auto-saves to your device and continues while you're away.
   what auto-sells ripe crops.)
 - **Game speed** — the chip in the top bar (`×1`) cycles **×1…×5** to run the
   whole grove faster.
+- **Auto-harvester** ($2,500) auto-harvests **and** replants every planter for
+  **1 mana per crop** (both actions); with no mana it waits.
+- **Prestige** (opens once you've earned $2,000): bank **+1 point per $50** earned,
+  reset everything but your points, and gain **+1% plant speed per point**.
 - **Buy** — spend earnings on upgrades (the shop scrolls; collapse it with the ⌃ bar):
   - **planter** — adds another planter slot.
   - **candle** — set one on a corner of the Ritual slate (four complete the circle).

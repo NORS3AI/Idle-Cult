@@ -63,6 +63,9 @@ const UI = (() => {
       s.combat ? s.combat.status + s.combat.log.length : 'nocombat',
       s.hpBought + '/' + s.cashLootBought + '/' + s.manaLootBought,
       buyMult, (s.trinkets || []).length,
+      // prestige (pending only forces rebuilds while its tab is open)
+      Game.prestigeUnlocked(), Game.prestigePoints(),
+      activeTab === 'prestige' ? Game.pendingPrestige() : 0,
     ].join(';');
   }
 
@@ -73,7 +76,7 @@ const UI = (() => {
     el('speedBtn').classList.toggle('fast', Game.speed() > 1);
     const mt = el('manaTop');
     mt.innerHTML = '✦&nbsp;' + Math.floor(G().mana);
-    mt.style.display = Game.ritualUnlocked() ? 'inline-flex' : 'none';
+    mt.style.display = (Game.ritualUnlocked() || Game.has('auto-harvester') || G().mana > 0) ? 'inline-flex' : 'none';
   }
   function renderTabs() {
     if (!Game.tabUnlocked(activeTab)) activeTab = 'home';
@@ -83,7 +86,7 @@ const UI = (() => {
        </button>`).join('');
   }
   function showView() {
-    ['home', 'notebook', 'combat', 'research'].forEach(v =>
+    ['home', 'notebook', 'combat', 'research', 'prestige'].forEach(v =>
       el('view-' + v).style.display = (v === activeTab ? 'block' : 'none'));
   }
 
@@ -302,7 +305,7 @@ const UI = (() => {
       const cost = Game.fieldCost(f.id);
       const costHtml = cost.mana != null ? `✦ ${cost.mana}` : Game.fmtMoney(cost.cash);
       let head, small;
-      if (f.id === 'shield') { head = `🛡 +${f.minutes}m`; small = Game.fmtTime(c.shieldRemaining) + ' left'; }
+      if (f.id === 'shield') { const st = Game.shieldTier(); head = `🛡 +${st.minutes}m`; small = `${Game.fmtTime(c.shieldRemaining)} · ${Math.round(st.block * 100)}%`; }
       else if (f.id === 'hp') { head = `❤ +${Game.fieldNextAmount('hp')}`; small = `+${Game.hpAdded()} total`; }
       else if (f.id === 'cashloot') { head = `$ +1% loot`; small = `+${G().cashLootBought}%`; }
       else { head = `✦ +1% loot`; small = `+${G().manaLootBought}%`; }
@@ -390,6 +393,31 @@ const UI = (() => {
         <p class="muted">Research nodes are being prepared — check back soon.</p></div>`;
   }
 
+  /* ---------- PRESTIGE ---------- */
+  function renderPrestige() {
+    const body = el('prestigeBody');
+    const pts = Game.prestigePoints();
+    const pending = Game.pendingPrestige();
+    const speed = Math.round(pts * Game.CONFIG.prestigeSpeedPer * 100);
+    body.innerHTML = `
+      <p class="tab-intro">Offer everything to the cult and begin anew. You keep only your devotion.</p>
+      <div class="prestige-stat"><span>Prestige points</span><b>${pts}</b></div>
+      <div class="prestige-stat"><span>Plant speed bonus</span><b>+${speed}%</b></div>
+      <div class="prestige-stat"><span>Ready to claim now</span><b class="${pending > 0 ? 'good' : 'muted'}">+${pending}</b></div>
+      <div class="prestige-note">You earn <b>+1 point per $50</b> earned this run. Prestiging resets your money,
+      plants, upgrades, candles, mana and combat progress — but each point permanently adds
+      <b>+1% plant speed</b>.</div>
+      <button class="btn primary prestige-btn ${pending > 0 ? '' : 'disabled'}" id="prestigeBtn">
+        Prestige for +${pending} point${pending === 1 ? '' : 's'}</button>`;
+    const b = el('prestigeBtn');
+    if (b) b.addEventListener('click', () => {
+      if (Game.pendingPrestige() < 1) return;
+      if (!confirm(`Prestige now for +${Game.pendingPrestige()} points? You will lose everything except prestige points.`)) return;
+      const r = Game.doPrestige();
+      if (r) { activeTab = 'home'; if (typeof confetti === 'function') confetti(); toast(`Reborn with <b>${r.total}</b> prestige points — +${Math.round(r.total * Game.CONFIG.prestigeSpeedPer * 100)}% plant speed.`); forceRebuild(); render(); }
+    });
+  }
+
   /* ---------- master render ---------- */
   function render() {
     renderTop();
@@ -400,6 +428,7 @@ const UI = (() => {
       else if (activeTab === 'notebook') renderNotebook();
       else if (activeTab === 'combat') renderCombat();
       else if (activeTab === 'research') renderResearch();
+      else if (activeTab === 'prestige') renderPrestige();
       lastSig = sig;
     }
     updateLive();

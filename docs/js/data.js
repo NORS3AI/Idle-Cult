@@ -5,14 +5,14 @@
 
 const SEEDS = [
   // grow = seconds, sell/cost = cents, unlockAt = lifetime cents earned to reveal
-  { id: 'radish',   name: 'radish',   icon: '🥬', cost: 2,       grow: 6,     sell: 24,       unlockAt: 0 },
-  { id: 'carrot',   name: 'carrot',   icon: '🥕', cost: 17,      grow: 30,    sell: 170,      unlockAt: 270 },       // $2.70
-  { id: 'cabbage',  name: 'cabbage',  icon: '🥦', cost: 86,      grow: 240,   sell: 856,      unlockAt: 1890 },      // $18.90 (4 min)
-  { id: 'pumpkin',  name: 'pumpkin',  icon: '🎃', cost: 886,     grow: 2160,  sell: 8862,     unlockAt: 3323 },      // $33.23 (36 min)
-  { id: 'eggplant', name: 'eggplant', icon: '🍆', cost: 2762,    grow: 5400,  sell: 27623,    unlockAt: 12000 },     // (90 min)
-  { id: 'corn',     name: 'corn',     icon: '🌽', cost: 8787,    grow: 18840, sell: 87867,    unlockAt: 80000 },     // (314 min)
-  { id: 'cucumber', name: 'cucumber', icon: '🥒', cost: 278316,  grow: 42720, sell: 2783164,  unlockAt: 600000 },    // (712 min)
-  { id: 'melon',    name: 'melon',    icon: '🍈', cost: 4937219, grow: 62640, sell: 49372188, unlockAt: 5000000 },   // (1044 min)
+  { id: 'radish',     name: 'radish',     icon: '🥬', cost: 2,        grow: 6,      sell: 24,        unlockAt: 0 },
+  { id: 'cabbage',    name: 'cabbage',    icon: '🥦', cost: 10,       grow: 30,     sell: 120,       unlockAt: 222 },      // earn $2.22
+  { id: 'garlic',     name: 'garlic',     icon: '🧄', cost: 70,       grow: 120,    sell: 864,       unlockAt: 2700 },     // earn $27  (2 min)
+  { id: 'ginger',     name: 'ginger',     icon: '🫚', cost: 700,      grow: 2340,   sell: 8872,      unlockAt: 14000 },    // earn $140 (39 min)
+  { id: 'yarrow',     name: 'yarrow',     icon: '🌿', cost: 10000,    grow: 14400,  sell: 130000,    unlockAt: 50000 },    // earn $500 (4 h)
+  { id: 'mandrake',   name: 'mandrake',   icon: '🌱', cost: 160000,   grow: 43200,  sell: 2000000,   unlockAt: 150000 },   // earn $1.5k (12 h)
+  { id: 'wormwood',   name: 'wormwood',   icon: '🍂', cost: 3200000,  grow: 129600, sell: 40000000,  unlockAt: 500000 },   // earn $5k  (36 h)
+  { id: 'belladonna', name: 'belladonna', icon: '🫐', cost: 72000000, grow: 259200, sell: 900000000, unlockAt: 2000000 },  // earn $20k (72 h)
 ];
 
 const SEEDS_BY_ID = Object.fromEntries(SEEDS.map(s => [s.id, s]));
@@ -21,15 +21,14 @@ const SEEDS_BY_ID = Object.fromEntries(SEEDS.map(s => [s.id, s]));
    - "stock"  : restocks infinitely; price scales per purchase  (planter)
    - "capped" : limited total quantity                          (candle, max 4)
    - "once"   : one-time unlock that vanishes once bought       (map, notebook) */
+// Prices are FLAT (no scaling). "capped" items sell a limited quantity.
 const ITEMS = [
   {
-    id: 'planter', name: 'planter', kind: 'stock',
-    base: 222, priceMul: 1.7, stockSize: 5,
+    id: 'planter', name: 'planter', kind: 'capped', cap: 5, base: 222,
     desc: 'Adds a planter slot to grow more crops at once.',
   },
   {
-    id: 'candle', name: 'candle', kind: 'capped',
-    base: 667, priceMul: 1.9, cap: 4,
+    id: 'candle', name: 'candle', kind: 'capped', cap: 4, base: 667,
     desc: 'Set a candle on a corner of the Ritual slate. Four candles complete the circle.',
   },
   {
@@ -53,20 +52,28 @@ const ITEMS = [
     desc: 'Tools for splicing strains. (More uses coming soon.)',
   },
   {
-    id: 'auto-harvester', name: 'auto-harvester', kind: 'once', base: 250000,
-    desc: 'Automatically harvests and replants every planter, hands-free.',
+    id: 'auto-harvester', name: 'auto-harvester', kind: 'once', base: 250000, info: true,
+    desc: 'Automatically harvests and replants every planter for 1 mana per crop (harvest + replant). No mana, no action.',
   },
   {
     id: 'thurible', name: 'thurible', kind: 'once', base: 750000, info: true,
-    desc: 'A swinging censer of sacred smoke. (Effect coming soon.)',
+    desc: 'Sacred smoke quickens the grove: +5% plant growth speed.',
   },
   {
-    id: 'poultice', name: 'poultice', kind: 'once', base: 100000000, info: true,
-    desc: 'A healing salve for the wounded faithful. (Effect coming soon.)',
+    id: 'brazier', name: 'brazier', kind: 'once', base: 8500000, info: true,   // $85k
+    desc: 'Upgrades the combat ward to +15 minutes and a 65% block chance.',
   },
   {
-    id: 'compass', name: 'compass', kind: 'once', base: 400000000, info: true,
-    desc: 'Points beyond the known map. (Effect coming soon.)',
+    id: 'poultice', name: 'poultice', kind: 'once', base: 100000000, info: true,  // $1m
+    desc: 'Passive expedition healing: +1 heart every 6 seconds.',
+  },
+  {
+    id: 'compass', name: 'compass', kind: 'once', base: 400000000, info: true,    // $4m
+    desc: 'Expeditions progress 50% faster.',
+  },
+  {
+    id: 'ironwood', name: 'ironwood', kind: 'once', base: 8000000000, info: true, // $80m
+    desc: 'Upgrades the combat ward to +1 hour and an 85% block chance.',
   },
 ];
 
@@ -104,6 +111,7 @@ const TABS = [
   { id: 'notebook', icon: '✒', label: 'Notebook', needs: 'notebook' },
   { id: 'combat',   icon: '⚔', label: 'Combat',   needs: 'map' },
   { id: 'research', icon: '⚗', label: 'Research', needs: 'research' },
+  { id: 'prestige', icon: '☥', label: 'Prestige', needs: '@prestige' }, // special: unlocked by earnings
 ];
 
 /* ----- Combat / expeditions ----- */
@@ -171,6 +179,19 @@ const CONFIG = {
   ledgerRate: 0.04,              // 4% of average planted crop value per second
   baseHp: 10,                   // starting maximum hearts
   eventMin: 2, eventMax: 3,     // seconds between expedition events
+  autoHarvestMana: 1,           // mana per crop (harvest + replant) for the auto-harvester
+  thuribleHaste: 0.05,          // +5% plant growth speed
+  compassSpeed: 1.5,            // expeditions run 50% faster
+  poulticeHealEvery: 6,         // seconds between +1 heart in combat
+  prestigeUnlockEarned: 200000, // $2,000 lifetime opens Prestige
+  prestigePer: 5000,            // +1 prestige point per $50 earned
+  prestigeSpeedPer: 0.01,       // +1% plant speed per prestige point
+  // combat ward tiers: base → brazier → ironwood
+  shieldTiers: {
+    base:     { minutes: 3,  block: 0.50 },
+    brazier:  { minutes: 15, block: 0.65 },
+    ironwood: { minutes: 60, block: 0.85 },
+  },
 
   baseSlots: 1,
   offlineCapSeconds: 24 * 3600,  // cap offline progress at 24 hours
