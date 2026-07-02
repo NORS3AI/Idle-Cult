@@ -48,9 +48,11 @@
     // backup tick so logic still advances if the tab throttles rAF
     setInterval(() => { Game.tick(Game.now()); }, 1000);
 
-    // autosave
-    setInterval(Game.save, 5000);
+    // autosave — save often and on every reliable lifecycle event.
+    // iOS Safari does NOT fire 'beforeunload' dependably; 'pagehide' + visibility do.
+    setInterval(Game.save, 3000);
     window.addEventListener('beforeunload', Game.save);
+    window.addEventListener('pagehide', Game.save);
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) Game.save();
       else { const o = Game.applyOffline(); UI.forceRebuild(); UI.render(); UI.showOfflineToast(o); }

@@ -32,7 +32,24 @@ const Game = (() => {
   function has(itemId) { return (state.items[itemId] || 0) > 0; }
   function tabUnlocked(tabId) {
     const tab = TABS.find(t => t.id === tabId);
-    return !tab || !tab.needs || has(tab.needs);
+    if (!tab || !tab.needs) return true;
+    if (tab.needs === '@prestige') return prestigeUnlocked();
+    return has(tab.needs);
+  }
+
+  /* ---------- prestige ---------- */
+  function prestigeUnlocked() { return !!state.prestigeUnlocked; }
+  function pendingPrestige() { return Math.floor(state.totalEarned / CONFIG.prestigePer); }
+  function prestigePoints() { return state.prestigePoints || 0; }
+  function doPrestige() {
+    const gain = pendingPrestige();
+    if (gain < 1) return false;
+    const kept = (state.prestigePoints || 0) + gain;
+    state = freshState();
+    state.prestigePoints = kept;
+    state.prestigeUnlocked = true;
+    save();
+    return { gained: gain, total: kept };
   }
   function avgPlantedSell(includeLast) {
     const vals = state.planters
@@ -65,9 +82,14 @@ const Game = (() => {
     const bought = id === 'hp' ? (state.hpBought || 0) : id === 'cashloot' ? (state.cashLootBought || 0) : (state.manaLootBought || 0);
     return { cash: stepDollars(bought) * 100 };
   }
+  function shieldTier() {
+    if (has('ironwood')) return CONFIG.shieldTiers.ironwood;
+    if (has('brazier')) return CONFIG.shieldTiers.brazier;
+    return CONFIG.shieldTiers.base;
+  }
   function fieldNextAmount(id) {                            // the increment the NEXT purchase grants
     if (id === 'hp') return incHp(state.hpBought || 0);
-    if (id === 'shield') return 3;                          // minutes
+    if (id === 'shield') return shieldTier().minutes;
     return 1;                                               // +1%
   }
 
@@ -85,7 +107,9 @@ const Game = (() => {
   function canCastRitual() {
     return ritualReady() && state.mana >= ritualManaCost();
   }
-  function growthSpeed() { return 1; }                 // base; Research may raise this later
+  function growthSpeed() {
+    return 1 + (state.prestigePoints || 0) * CONFIG.prestigeSpeedPer + (has('thurible') ? CONFIG.thuribleHaste : 0);
+  }
   function effGrow(seed) { return seed.grow / growthSpeed(); }
   function speed() { return state.gameSpeed || 1; }    // game-speed multiplier ×1…×5
   function cycleSpeed() { state.gameSpeed = (speed() % CONFIG.maxSpeed) + 1; return state.gameSpeed; }
@@ -94,11 +118,7 @@ const Game = (() => {
   function ritualManaCost() { return SPELLS[0].mana; }
   function slotCount() { return CONFIG.baseSlots + (state.items.planter || 0); }
 
-  function itemPrice(item) {
-    if (item.kind === 'once') return item.base;
-    const n = state.items[item.id] || 0;
-    return Math.ceil(item.base * Math.pow(item.priceMul, n));
-  }
+  function itemPrice(item) { return item.base; }   // flat price
   function itemStockLeft(item) {
     const n = state.items[item.id] || 0;
     if (item.kind === 'once') return n > 0 ? 0 : 1;
@@ -138,6 +158,8 @@ const Game = (() => {
       hpBought: 0, cashLootBought: 0, manaLootBought: 0,
       combat: null,
       trinkets: [],
+      prestigePoints: 0,
+      prestigeUnlocked: false,
       lastTick: now(),
     };
   }
@@ -151,6 +173,7 @@ const Game = (() => {
     for (const s of SEEDS)
       if (!state.unlockedSeeds.includes(s.id) && state.totalEarned >= s.unlockAt)
         state.unlockedSeeds.push(s.id);
+    if (!state.prestigeUnlocked && state.totalEarned >= CONFIG.prestigeUnlockEarned) state.prestigeUnlocked = true;
   }
 
   /* ---------- planter actions ---------- */
@@ -274,7 +297,7 @@ const Game = (() => {
     for (const e of area.events) { if ((r -= e.w) <= 0) { ev = e; break; } }
     let dmg = ev.dmg || 0;
     if (dmg && c.shieldRemaining > 0) {
-      const block = FIELD_UPGRADES.find(f => f.id === 'shield').block;
+      const block = shieldTier().block;
       let blocked = 0; for (let i = 0; i < dmg; i++) if (Math.random() < block) blocked++; dmg -= blocked;
     }
     const cash = ev.cash ? irnd(ev.cash[0], ev.cash[1]) : 0;
@@ -289,8 +312,14 @@ const Game = (() => {
     const c = state.combat;
     if (!c || c.status !== 'running' || c.paused) return;
     const area = AREAS_BY_ID[c.areaId];
+    sdt *= (has('compass') ? CONFIG.compassSpeed : 1);   // compass: faster expeditions
     c.elapsed += sdt;
     if (c.shieldRemaining > 0) c.shieldRemaining = Math.max(0, c.shieldRemaining - sdt);
+    // poultice: passive healing (+1 heart every N seconds), never above max
+    if (has('poultice')) {
+      c.healAcc = (c.healAcc || 0) + sdt;
+      while (c.healAcc >= CONFIG.poulticeHealEvery) { c.healAcc -= CONFIG.poulticeHealEvery; if (c.hp < maxHp()) c.hp++; }
+    }
     let guard = 0;
     while (c.status === 'running' && c.elapsed >= c.nextEventAt && c.nextEventAt < c.duration && guard++ < 50) {
       fireEvent(c, area);
@@ -310,7 +339,7 @@ const Game = (() => {
       const cost = fieldCost(id);
       if (cost.mana != null) { if (!spendMana(cost.mana)) break; }
       else if (cost.cash != null) { if (!spendCash(cost.cash)) break; }
-      if (id === 'shield') { c.shieldRemaining += FIELD_UPGRADES.find(f => f.id === 'shield').minutes * 60; }
+      if (id === 'shield') { c.shieldRemaining += shieldTier().minutes * 60; }
       else if (id === 'hp') { const inc = incHp(state.hpBought || 0); state.hpBought = (state.hpBought || 0) + 1; c.hp += inc; }
       else if (id === 'cashloot') { state.cashLootBought = (state.cashLootBought || 0) + 1; }
       else if (id === 'manaloot') { state.manaLootBought = (state.manaLootBought || 0) + 1; }
@@ -365,11 +394,24 @@ const Game = (() => {
     const sdt = dt * speed();             // sped-up game seconds this frame
     state.mana += manaRegenPerSec() * sdt;
     const inc = ledgerPerSec(false) * sdt; if (inc > 0) earn(inc);
+    const auto = autoHarvest();
     for (const p of state.planters) {
-      if (!p.seed) continue;
-      if (!isGrown(p)) p.prog += sdt;
-      if (isGrown(p) && autoHarvest()) {   // auto-harvester only auto-SELLS (planting is manual)
-        earn(SEEDS_BY_ID[p.seed].sell * multiplier()); p.seed = null; p.prog = 0;
+      if (p.seed) {
+        if (!isGrown(p)) p.prog += sdt;
+        // auto-harvester: harvest ripe + replant same crop, 1 mana per crop
+        if (isGrown(p) && auto && state.mana >= CONFIG.autoHarvestMana) {
+          state.mana -= CONFIG.autoHarvestMana;
+          earn(SEEDS_BY_ID[p.seed].sell * multiplier());
+          const s2 = SEEDS_BY_ID[p.lastSeed];
+          if (p.lastSeed && state.cents >= s2.cost) { state.cents -= s2.cost; p.prog = 0; }
+          else { p.seed = null; p.prog = 0; }
+        }
+      } else if (auto && p.repeat && p.lastSeed) {
+        // auto-plant a saved empty spot (also 1 mana)
+        const s2 = SEEDS_BY_ID[p.lastSeed];
+        if (state.mana >= CONFIG.autoHarvestMana && state.cents >= s2.cost) {
+          state.mana -= CONFIG.autoHarvestMana; state.cents -= s2.cost; p.seed = p.lastSeed; p.prog = 0;
+        }
       }
     }
     tickCombat(sdt);
@@ -385,20 +427,26 @@ const Game = (() => {
     let gained = 0;
     // ledger passive income (based on what is/was planted)
     gained += ledgerPerSec(true) * dt;
-    // planters: nothing is auto-planted while away. A crop matures and waits;
-    // the auto-harvester sells it once when ripe.
-    // offline advances at real time (game-speed only applies to active play)
+    // offline advances at real time (game-speed only applies to active play).
+    // Auto-harvester cycles are limited by the mana that accrues while away.
+    const auto = autoHarvest();
+    let manaAvail = state.mana + manaRegenPerSec() * dt;
     for (const p of state.planters) {
       if (!p.seed) continue;
       const seed = SEEDS_BY_ID[p.seed];
       const g = effGrow(seed);
       p.prog += dt;
       if (p.prog < g) continue;                    // still growing
-      if (autoHarvest()) { gained += seed.sell * mult; p.seed = null; p.prog = 0; }
-      else { p.prog = g; }                          // ripe, waiting for a manual sell
+      if (!auto) { p.prog = g; continue; }         // ripe, waits for a manual sell
+      let cycles = 1 + Math.floor((p.prog - g) / g);
+      cycles = Math.min(cycles, Math.floor(manaAvail / CONFIG.autoHarvestMana));
+      if (cycles <= 0) { p.prog = g; continue; }   // ripe but no mana → wait
+      manaAvail -= cycles * CONFIG.autoHarvestMana;
+      gained += cycles * (seed.sell * mult - seed.cost);
+      p.prog = (p.prog - g) % g;                    // carry remainder into the next crop
     }
     if (gained > 0) earn(gained);
-    state.mana += manaRegenPerSec() * dt;      // mana keeps recharging while away
+    state.mana = manaAvail;                          // leftover (includes accrued regen)
     state.lastTick = t;
     return gained > 0 ? { seconds: dt, gained } : null;
   }
@@ -417,7 +465,8 @@ const Game = (() => {
         if (!Array.isArray(state.discovered)) state.discovered = [];
         if (!state.notes || typeof state.notes !== 'object') state.notes = {};
         if (!Array.isArray(state.trinkets)) state.trinkets = [];
-        ['hpBought', 'cashLootBought', 'manaLootBought'].forEach(k => { if (typeof state[k] !== 'number') state[k] = 0; });
+        ['hpBought', 'cashLootBought', 'manaLootBought', 'prestigePoints'].forEach(k => { if (typeof state[k] !== 'number') state[k] = 0; });
+        if (typeof state.prestigeUnlocked !== 'boolean') state.prestigeUnlocked = false;
         if (state.combat === undefined) state.combat = null;
         if (!(state.gameSpeed >= 1 && state.gameSpeed <= CONFIG.maxSpeed)) state.gameSpeed = 1;
         if (!Array.isArray(state.planters) || !state.planters.length) state.planters = [makePlanter()];
@@ -451,7 +500,8 @@ const Game = (() => {
     itemPrice, itemStockLeft, itemSoldOut, nextLockedSeed,
     ritualUnlocked, candleCount,
     ritualReady, canCastRitual, activeRite, castRitual,
-    combat, startExpedition, togglePause, buyField, collectLoot, dismissDeath,
+    combat, startExpedition, togglePause, buyField, collectLoot, dismissDeath, shieldTier,
+    prestigeUnlocked, pendingPrestige, prestigePoints, doPrestige,
     plant, sell, replantSpot, toggleRepeat, buyItem,
     toggleCandle, setRune, cycleRune, setNote,
     isGrown, progress, timeLeft,
