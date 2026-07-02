@@ -48,8 +48,34 @@ const Game = (() => {
     state = freshState();
     state.prestigePoints = kept;
     state.prestigeUnlocked = true;
+    state.hasPrestiged = true;
+    startDaily();
     save();
     return { gained: gain, total: kept };
+  }
+
+  /* ---------- daily quests & scrolls ---------- */
+  function startDaily() {
+    state.dailyHarvests = 0;
+    state.questClaimed = DAILY_QUESTS.map(() => false);
+    state.dailyResetAt = now() + CONFIG.dailyResetSeconds * 1000;
+  }
+  function checkDailyReset() {
+    if (!state.hasPrestiged) return;
+    if (!state.dailyResetAt) { startDaily(); return; }
+    if (now() >= state.dailyResetAt) startDaily();
+  }
+  function countHarvest(n) { if (state.hasPrestiged) state.dailyHarvests += (n || 1); }
+  function dailyTimeLeft() { return Math.max(0, (state.dailyResetAt - now()) / 1000); }
+  function questProgress(i) { return Math.min(state.dailyHarvests, DAILY_QUESTS[i].target); }
+  function questClaimable(i) { return state.dailyHarvests >= DAILY_QUESTS[i].target && !state.questClaimed[i]; }
+  function allQuestsClaimed() { return state.questClaimed.every(Boolean); }
+  function dailyActive() { return state.hasPrestiged && !allQuestsClaimed(); }  // window open?
+  function claimQuest(i) {
+    if (!questClaimable(i)) return false;
+    state.scrolls += DAILY_QUESTS[i].reward;
+    state.questClaimed[i] = true;
+    return true;
   }
   function avgPlantedSell(includeLast) {
     const vals = state.planters
@@ -163,6 +189,11 @@ const Game = (() => {
       prestigeUnlocked: false,
       hpBonus: 0,
       devMode: false,
+      scrolls: 0,
+      hasPrestiged: false,
+      dailyHarvests: 0,
+      questClaimed: [false, false, false, false],
+      dailyResetAt: 0,
       lastTick: now(),
     };
   }
@@ -207,6 +238,7 @@ const Game = (() => {
     const p = state.planters[planterIndex];
     if (!p || !p.seed || !isGrown(p)) return false;
     earn(SEEDS_BY_ID[p.seed].sell * multiplier());
+    countHarvest(1);
     p.seed = null; p.prog = 0;          // keep lastSeed so the spot can be replanted
     return true;
   }
@@ -394,6 +426,7 @@ const Game = (() => {
     if (dt <= 0) { state.lastTick = t; return; }
     if (dt > 10) { applyOffline(); return; } // a real gap (sleep/close) → real-time offline path
     state.lastTick = t;
+    checkDailyReset();
     const sdt = dt * speedFactor();       // sped-up game seconds this frame
     state.mana += manaRegenPerSec() * sdt;
     const inc = ledgerPerSec(false) * sdt; if (inc > 0) earn(inc);
@@ -405,6 +438,7 @@ const Game = (() => {
         if (isGrown(p) && auto && state.mana >= CONFIG.autoHarvestMana) {
           state.mana -= CONFIG.autoHarvestMana;
           earn(SEEDS_BY_ID[p.seed].sell * multiplier());
+          countHarvest(1);
           const s2 = SEEDS_BY_ID[p.lastSeed];
           if (p.lastSeed && state.cents >= s2.cost) { state.cents -= s2.cost; p.prog = 0; }
           else { p.seed = null; p.prog = 0; }
@@ -423,6 +457,7 @@ const Game = (() => {
   /* ---------- offline progress (closed-form) ---------- */
   function applyOffline() {
     const t = now();
+    checkDailyReset();                          // daily quests can roll over while away
     let dt = (t - state.lastTick) / 1000;
     if (dt <= 1) { state.lastTick = t; return null; }
     dt = Math.min(dt, CONFIG.offlineCapSeconds);
@@ -446,6 +481,7 @@ const Game = (() => {
       if (cycles <= 0) { p.prog = g; continue; }   // ripe but no mana → wait
       manaAvail -= cycles * CONFIG.autoHarvestMana;
       gained += cycles * (seed.sell * mult - seed.cost);
+      countHarvest(cycles);
       p.prog = (p.prog - g) % g;                    // carry remainder into the next crop
     }
     if (gained > 0) earn(gained);
@@ -468,9 +504,12 @@ const Game = (() => {
         if (!Array.isArray(state.discovered)) state.discovered = [];
         if (!state.notes || typeof state.notes !== 'object') state.notes = {};
         if (!Array.isArray(state.trinkets)) state.trinkets = [];
-        ['hpBought', 'cashLootBought', 'manaLootBought', 'prestigePoints', 'hpBonus'].forEach(k => { if (typeof state[k] !== 'number') state[k] = 0; });
+        ['hpBought', 'cashLootBought', 'manaLootBought', 'prestigePoints', 'hpBonus', 'scrolls', 'dailyHarvests', 'dailyResetAt'].forEach(k => { if (typeof state[k] !== 'number') state[k] = 0; });
         if (typeof state.prestigeUnlocked !== 'boolean') state.prestigeUnlocked = false;
         if (typeof state.devMode !== 'boolean') state.devMode = false;
+        if (typeof state.hasPrestiged !== 'boolean') state.hasPrestiged = false;
+        if (!Array.isArray(state.questClaimed) || state.questClaimed.length !== DAILY_QUESTS.length) state.questClaimed = DAILY_QUESTS.map(() => false);
+        checkDailyReset();
         if (state.combat === undefined) state.combat = null;
         if (!(state.gameSpeed >= 1 && state.gameSpeed <= CONFIG.maxSpeed)) state.gameSpeed = 1;
         if (!Array.isArray(state.planters) || !state.planters.length) state.planters = [makePlanter()];
@@ -504,6 +543,7 @@ const Game = (() => {
     else if (kind === 'cashloot') state.cashLootBought = (state.cashLootBought || 0) + amount;
     else if (kind === 'manaloot') state.manaLootBought = (state.manaLootBought || 0) + amount;
     else if (kind === 'hp') state.hpBonus = (state.hpBonus || 0) + amount;
+    else if (kind === 'scrolls') state.scrolls = (state.scrolls || 0) + amount;
     save();
   }
 
@@ -520,11 +560,12 @@ const Game = (() => {
     ritualReady, canCastRitual, activeRite, castRitual,
     combat, startExpedition, togglePause, buyField, collectLoot, dismissDeath, shieldTier,
     prestigeUnlocked, pendingPrestige, prestigePoints, doPrestige,
+    dailyActive, dailyTimeLeft, questProgress, questClaimable, claimQuest, allQuestsClaimed,
     plant, sell, replantSpot, toggleRepeat, buyItem,
     toggleCandle, setRune, cycleRune, setNote,
     isGrown, progress, timeLeft,
     tick, applyOffline, save, load, reset,
-    SEEDS, ITEMS, TABS, RUNES, SPELLS, AREAS, FIELD_UPGRADES, AREAS_BY_ID, PATCH_NOTES,
+    SEEDS, ITEMS, TABS, RUNES, SPELLS, AREAS, FIELD_UPGRADES, AREAS_BY_ID, PATCH_NOTES, DAILY_QUESTS,
     SEEDS_BY_ID, ITEMS_BY_ID, RUNES_BY_ID, SPELLS_BY_ID, CONFIG,
   };
 })();
