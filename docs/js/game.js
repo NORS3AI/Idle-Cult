@@ -96,9 +96,8 @@ const Game = (() => {
     if (!vals.length) return 0;
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   }
-  function ledgerPerSec(includeLast) {
-    if (!has('ledger')) return 0;
-    return CONFIG.ledgerRate * avgPlantedSell(includeLast) * multiplier();
+  function ledgerPerSec() {
+    return has('ledger') ? CONFIG.ledgerFlat : 0;   // flat $0.40/s
   }
   function autoHarvest() { return has('auto-harvester'); }
 
@@ -139,10 +138,13 @@ const Game = (() => {
   function runeSeqStr() { return (state.runeSeq || []).join(''); }
   function applyRite(effect) {
     if (effect === 'halveRemaining') {
+      const t = now();
       state.planters.forEach(p => {
         if (p.seed && !isGrown(p)) {
           const g = effGrow(SEEDS_BY_ID[p.seed]);
           p.prog += (g - p.prog) * CONFIG.ritualHalve;
+          p.riteCount = (p.riteCount || 0) + 1;   // badge: 1, 1.1, 1.2, … until this crop ripens
+          p.flashAt = t;                          // trigger the green flash
         }
       });
     } else if (effect === 'haste5') {
@@ -210,7 +212,7 @@ const Game = (() => {
   function candleCount() { return state.items.candle || 0; }
 
   /* ---------- state setup ---------- */
-  function makePlanter() { return { seed: null, prog: 0, repeat: false, lastSeed: null }; }
+  function makePlanter() { return { seed: null, prog: 0, repeat: false, lastSeed: null, riteCount: 0, flashAt: 0 }; }
   function makeCandle() { return { lit: false }; }
   function freshState() {
     return {
@@ -267,7 +269,7 @@ const Game = (() => {
     if (planterIndex != null) { p = state.planters[planterIndex]; if (!p || p.seed) return false; }
     else { p = state.planters.find(pl => !pl.seed); if (!p) return false; }
     state.cents -= seed.cost;
-    p.seed = seedId; p.lastSeed = seedId; p.prog = 0;
+    p.seed = seedId; p.lastSeed = seedId; p.prog = 0; p.riteCount = 0;
     return true;
   }
   function isGrown(p) {
@@ -497,14 +499,14 @@ const Game = (() => {
           earn(SEEDS_BY_ID[p.seed].sell * multiplier());
           countHarvest(1);
           const s2 = SEEDS_BY_ID[p.lastSeed];
-          if (p.lastSeed && state.cents >= s2.cost) { state.cents -= s2.cost; p.prog = 0; }
-          else { p.seed = null; p.prog = 0; }
+          if (p.lastSeed && state.cents >= s2.cost) { state.cents -= s2.cost; p.prog = 0; p.riteCount = 0; }
+          else { p.seed = null; p.prog = 0; p.riteCount = 0; }
         }
       } else if (auto && p.repeat && p.lastSeed) {
         // auto-plant a saved empty spot (also 1 mana)
         const s2 = SEEDS_BY_ID[p.lastSeed];
         if (state.mana >= CONFIG.autoHarvestMana && state.cents >= s2.cost) {
-          state.mana -= CONFIG.autoHarvestMana; state.cents -= s2.cost; p.seed = p.lastSeed; p.prog = 0;
+          state.mana -= CONFIG.autoHarvestMana; state.cents -= s2.cost; p.seed = p.lastSeed; p.prog = 0; p.riteCount = 0;
         }
       }
     }
@@ -540,7 +542,7 @@ const Game = (() => {
       manaAvail -= cycles * CONFIG.autoHarvestMana;
       gained += cycles * (seed.sell * mult - seed.cost);
       countHarvest(cycles);
-      p.prog = (p.prog - g) % g;                    // carry remainder into the next crop
+      p.prog = (p.prog - g) % g; p.riteCount = 0;    // carry remainder into the next (fresh) crop
     }
     if (gained > 0) earn(gained);
     state.mana = manaAvail;                          // leftover (includes accrued regen)
@@ -548,9 +550,21 @@ const Game = (() => {
     return gained > 0 ? { seconds: dt, gained } : null;
   }
 
-  /* ---------- save / load ---------- */
+  /* ---------- save / load ----------
+     Write to BOTH localStorage and sessionStorage. Some in-app browsers /
+     private modes block or clear localStorage but keep sessionStorage across
+     a refresh, so this keeps progress from vanishing on reload. */
+  function writeStore(key, val) {
+    try { localStorage.setItem(key, val); } catch (e) {}
+    try { sessionStorage.setItem(key, val); } catch (e) {}
+  }
+  function readStore(key) {
+    try { const v = localStorage.getItem(key); if (v != null) return v; } catch (e) {}
+    try { const v = sessionStorage.getItem(key); if (v != null) return v; } catch (e) {}
+    return null;
+  }
   function save() {
-    try { localStorage.setItem(CONFIG.saveKey, JSON.stringify(state)); } catch (e) {}
+    try { writeStore(CONFIG.saveKey, JSON.stringify(state)); } catch (e) {}
   }
   // Defensively rebuild a valid state from any (possibly old-format) parsed save.
   // This must never throw, so a refresh can always restore progress.
@@ -579,15 +593,11 @@ const Game = (() => {
     return s;
   }
   function load() {
-    let raw = null;
-    try { raw = localStorage.getItem(CONFIG.saveKey); } catch (e) {}
+    const raw = readStore(CONFIG.saveKey);
     if (!raw) { state = freshState(); return false; }
     let parsed;
     try { parsed = JSON.parse(raw); }
-    catch (e) {                              // truly corrupt JSON — keep a copy, start fresh
-      try { localStorage.setItem(CONFIG.saveKey + '-corrupt', raw); } catch (e2) {}
-      state = freshState(); return false;
-    }
+    catch (e) { writeStore(CONFIG.saveKey + '-corrupt', raw); state = freshState(); return false; }
     try { state = sanitize(parsed); }
     catch (e) { state = Object.assign(freshState(), parsed); }  // last resort: keep raw fields
     try { checkDailyReset(); syncSlots(); checkUnlocks(); } catch (e) {}
@@ -596,6 +606,7 @@ const Game = (() => {
   function reset() { state = freshState(); save(); }
   function wipe() {                          // hard delete the save file
     try { localStorage.removeItem(CONFIG.saveKey); } catch (e) {}
+    try { sessionStorage.removeItem(CONFIG.saveKey); } catch (e) {}
     state = freshState(); save();
   }
   function setNote(spellId, text) { state.notes[spellId] = text; }

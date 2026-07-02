@@ -62,7 +62,7 @@ const ITEMS = [
   },
   {
     id: 'ledger', name: 'ledger', kind: 'once', base: 33300, info: true,
-    desc: 'Generates cash every second equal to 4% of the average crop value across your planters.',
+    desc: 'Generates a steady $0.40 per second.',
   },
   {
     id: 'grafting-kit', name: 'grafting kit', kind: 'once', base: 80000,
@@ -166,7 +166,7 @@ const AREAS = [
     ] },
   { id: 'blacktide', name: 'Blacktide Bay', icon: '🏴‍☠️',
     flavor: 'A coastal hideout where contraband and pirates lay in hiding',
-    visitCost: _c(200), duration: 1536,            /* ×10 = 3s */
+    visitCost: _c(200), duration: 9728,            /* ×10 = 19s */
     riskMin: 29, riskMax: 56, dmg: 6, trinketChance: 0.01,
     cashMin: _c(281), cashMax: _c(521), manaMin: 59, manaMax: 149, bloodMin: 1, bloodMax: 2,
     events: [
@@ -178,7 +178,7 @@ const AREAS = [
     ] },
   { id: 'cathedral', name: "Mad Max's Cathedral", icon: '⛪',
     flavor: 'A decrepit church filled with the dead and dust',
-    visitCost: _c(3000), duration: 4096,           /* ×10 = 8s */
+    visitCost: _c(3000), duration: 18944,          /* ×10 = 37s */
     riskMin: 251, riskMax: 300, dmg: 40, trinketChance: 0.04,
     cashMin: _c(4460), cashMax: _c(7520), manaMin: 507, manaMax: 689, bloodMin: 3, bloodMax: 15,
     events: [
@@ -189,7 +189,7 @@ const AREAS = [
     ] },
   { id: 'windsor', name: 'Windsor Castle', icon: '🏰',
     flavor: 'A fortress hiding a hidden darkness',
-    visitCost: _c(80000), duration: 9728,          /* ×10 = 19s */
+    visitCost: _c(80000), duration: 33792,          /* ×10 = 66s */
     riskMin: 1920, riskMax: 2280, dmg: 300, trinketChance: 0.07,
     cashMin: _c(120000), cashMax: _c(200000), manaMin: 7090, manaMax: 8880, bloodMin: 38, bloodMax: 71,
     events: [
@@ -200,7 +200,7 @@ const AREAS = [
     ] },
   { id: 'bright', name: 'The Bright Court', icon: '☀️',
     flavor: 'The High Heavens on earth',
-    visitCost: _c(2e6), duration: 13824,           /* ×10 = 27s */
+    visitCost: _c(2e6), duration: 50688,           /* ×10 = 99s */
     riskMin: 16300, riskMax: 18900, dmg: 2500, trinketChance: 0.11,
     cashMin: _c(2.9e6), cashMax: _c(5.1e6), manaMin: 855, manaMax: 1260, bloodMin: 190, bloodMax: 255, // cash inferred
     events: [
@@ -211,7 +211,7 @@ const AREAS = [
     ] },
   { id: 'forgotten', name: 'The Forgotten Court', icon: '🌲',
     flavor: 'Where the forgotten things roam',
-    visitCost: _c(90e6), duration: 20992,          /* ×10 = 41s */
+    visitCost: _c(90e6), duration: 74240,          /* ×10 = 145s */
     riskMin: 112000, riskMax: 125000, dmg: 17000, trinketChance: 0.17,
     cashMin: _c(135e6), cashMax: _c(322e6), manaMin: 12500, manaMax: 18000, bloodMin: 533, bloodMax: 640,
     events: [
@@ -222,7 +222,7 @@ const AREAS = [
     ] },
   { id: 'void', name: 'The Void', icon: '🌌',
     flavor: "Nyl'Thraxil was born from the throat of a dying star",
-    visitCost: _c(130e12), duration: 33792,        /* ×10 = 66s */
+    visitCost: _c(130e12), duration: 128000,       /* ×10 = 250s */
     riskMin: 5450000, riskMax: 9000000, dmg: 1e6, trinketChance: 0.29,
     cashMin: _c(200e12), cashMax: _c(400e12), manaMin: 651e6, manaMax: 1.1e9, bloodMin: 65e6, bloodMax: 119e6, // ~1.5-3× the $130t visit cost
     bosses: ["Nyl'Thraxil", "Vyx'alith", "Dra'vah", "Mal'khorith", 'Cadence'],
@@ -266,7 +266,7 @@ const DAILY_QUESTS = [
 
 const CONFIG = {
   startCents: 10,
-  ledgerRate: 0.04,              // 4% of average planted crop value per second
+  ledgerFlat: 40,               // ledger passive income: $0.40/s (40 cents)
   baseHp: 10,                   // starting maximum hearts
   eventMin: 2, eventMax: 3,     // seconds between expedition events
   autoHarvestMana: 1,           // mana per crop (harvest + replant) for the auto-harvester
@@ -301,6 +301,13 @@ const CONFIG = {
 
 /* Patch notes — newest first. Shown in Settings. */
 const PATCH_NOTES = [
+  { v: '1.6', title: 'Ritual feedback, big runes & fixes', items: [
+    'Casting the quickening rite flashes a plant\'s progress bar green and tags it with a ⏱ badge (⏱ 1 → 1.1 → 1.2 … until harvest).',
+    'Runes are now big, reliable buttons in a bar below the slate — much easier to press.',
+    'Ledger income changed to a steady $0.40/s.',
+    'Expedition ×10 times retuned: 1 / 19 / 37 / 66 / 99 / 145 / 250 seconds.',
+    'Saves now also write to session storage, so a refresh keeps progress even when a browser blocks local storage.',
+  ] },
   { v: '1.5', title: 'Tuning & fixes', items: [
     'Ritual runes are reliably tappable again — light the candles, then tap the runes.',
     'Expedition speeds retuned: at ×10 the seven locations finish in 1 / 3 / 8 / 19 / 27 / 41 / 66 seconds.',
