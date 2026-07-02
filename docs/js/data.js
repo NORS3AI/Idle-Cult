@@ -56,6 +56,10 @@ const ITEMS = [
     desc: 'Automatically harvests and replants every planter for 1 mana per crop (harvest + replant). No mana, no action.',
   },
   {
+    id: 'auto-ritual', name: 'auto-ritual', kind: 'once', base: 2000000, info: true,   // $20k
+    desc: 'Adds an auto-cast button beside each rite you know in the Notebook.',
+  },
+  {
     id: 'thurible', name: 'thurible', kind: 'once', base: 750000, info: true,
     desc: 'Sacred smoke quickens the grove: +5% plant growth speed.',
   },
@@ -79,29 +83,23 @@ const ITEMS = [
 
 const ITEMS_BY_ID = Object.fromEntries(ITEMS.map(i => [i.id, i]));
 
-/* The four runes a candle can show. */
+/* The four runes on the Ritual slate — Norse runes for F, D, S, A,
+   arranged N/E/S/W. Tapping them builds a sequence that spells a rite. */
 const RUNES = [
-  { id: 'fehu',   sym: 'ᚠ', name: 'Fehu',   mean: 'wealth' },
-  { id: 'eihwaz', sym: 'ᛇ', name: 'Eihwaz', mean: 'growth' },
-  { id: 'sowilo', sym: 'ᛋ', name: 'Sowilo', mean: 'the sun' },
-  { id: 'othala', sym: 'ᛟ', name: 'Othala', mean: 'heritage' },
+  { id: 'F', letter: 'F', sym: 'ᚠ', pos: 'top' },     // Fehu
+  { id: 'D', letter: 'D', sym: 'ᛞ', pos: 'right' },   // Dagaz
+  { id: 'S', letter: 'S', sym: 'ᛋ', pos: 'bottom' },  // Sowilo
+  { id: 'A', letter: 'A', sym: 'ᚨ', pos: 'left' },    // Ansuz
 ];
 const RUNES_BY_ID = Object.fromEntries(RUNES.map(r => [r.id, r]));
 
-/* Rites (spells).
-   A rite is performed by lighting all four candles with ONE OF EACH rune.
-   Casting costs mana. The EFFECT IS DELIBERATELY HIDDEN from the player —
-   they discover what a rite does by casting it and writing notes in the
-   Notebook. More rites are earned as the game goes on; for now there is
-   one: it halves the remaining grow time of every plant in a planter. */
+/* Rites (spells) are cast by tapping a rune SEQUENCE. The effect is hidden —
+   the player figures it out and writes notes in the Notebook.
+   - rite_fdsa: given for free once the candles are lit (halves grow time).
+   - rite_thurible: hidden (A F S D) — each cast adds +5% permanent haste. */
 const SPELLS = [
-  {
-    id: 'rite_halftime',
-    runes: ['fehu', 'eihwaz', 'sowilo', 'othala'], // "one of each"
-    mana: 10,
-    effect: 'halveRemaining',
-    // no name / desc shown in-game — the player figures it out
-  },
+  { id: 'rite_fdsa',     seq: ['F', 'D', 'S', 'A'], mana: 10, effect: 'halveRemaining', given: true },
+  { id: 'rite_thurible', seq: ['A', 'F', 'S', 'D'], mana: 10, effect: 'haste5' },
 ];
 const SPELLS_BY_ID = Object.fromEntries(SPELLS.map(s => [s.id, s]));
 
@@ -213,11 +211,20 @@ const CONFIG = {
   buyPageSize: 4,                // shop shows four upgrades at a time
   maxSpeed: 10,                  // game-speed selector cycles ×1 … ×10 (each step halves time)
   dailyResetSeconds: 3600,       // daily quests refresh every hour
+  runeSeqTimeout: 20,            // seconds before a tapped rune sequence auto-clears
+  hasteStackPct: 0.05,           // +5% plant speed per Thurible-rite cast
   saveKey: 'idle-cult-save-v1',
 };
 
 /* Patch notes — newest first. Shown in Settings. */
 const PATCH_NOTES = [
+  { v: '1.0', title: 'Rune rites & Auto-Ritual', items: [
+    'Ritual slate remade: light the four candles, then tap Norse runes (F/D/S/A) to spell a rite.',
+    'The sequence shows at the top with an ✕ to clear; it also auto-clears after 20s.',
+    'First rite is free (F-D-S-A); discover the Thurible rite (A-F-S-D, +5% haste per cast) by experimenting.',
+    'Auto-Ritual upgrade ($20k) adds an auto-cast button beside each rite in the Notebook.',
+    'Affordable shop upgrades now glow gold and pulse.',
+  ] },
   { v: '0.9', title: 'Daily quests & scrolls', items: [
     'Daily quests appear after your first prestige — harvest plants to claim 📜 scrolls; they reset every hour.',
     'New Scrolls resource shown in the top bar next to cash and mana.',

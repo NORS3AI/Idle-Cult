@@ -119,22 +119,58 @@ const Game = (() => {
     return 1;                                               // +1%
   }
 
-  /* ---------- rituals (one of each rune) ---------- */
-  function ritualReady() {
-    if (candleCount() < CONFIG.candleCount) return false;
-    const lit = state.candles.filter(c => c.lit);
-    if (lit.length < CONFIG.candleCount) return false;
-    return new Set(lit.map(c => c.rune)).size === CONFIG.candleCount; // one of each
+  /* ---------- rituals (tap a rune sequence) ---------- */
+  function allCandlesLit() {
+    return candleCount() >= CONFIG.candleCount && state.candles.slice(0, CONFIG.candleCount).every(c => c.lit);
   }
-  function activeRite() {
-    // future: pick by exact rune arrangement. For now, the one known rite.
-    return SPELLS[0];
+  function runeSeqStr() { return (state.runeSeq || []).join(''); }
+  function applyRite(effect) {
+    if (effect === 'halveRemaining') {
+      state.planters.forEach(p => {
+        if (p.seed && !isGrown(p)) {
+          const g = effGrow(SEEDS_BY_ID[p.seed]);
+          p.prog += (g - p.prog) * CONFIG.ritualHalve;
+        }
+      });
+    } else if (effect === 'haste5') {
+      state.hasteStacks = (state.hasteStacks || 0) + 1;   // +5% permanent plant speed
+    }
   }
-  function canCastRitual() {
-    return ritualReady() && state.mana >= ritualManaCost();
+  function castSpellById(id) {
+    const sp = SPELLS_BY_ID[id];
+    if (!sp || state.mana < sp.mana) return false;
+    state.mana -= sp.mana;
+    applyRite(sp.effect);
+    if (!state.discovered.includes(id)) state.discovered.push(id);
+    return true;
+  }
+  // tap a rune letter → append to the sequence; cast when it exactly matches a spell
+  function tapRune(letter) {
+    if (!allCandlesLit()) return null;
+    state.runeSeq = state.runeSeq || [];
+    state.runeSeq.push(letter);
+    state.runeSeqAt = now();
+    const cur = runeSeqStr();
+    const sp = SPELLS.find(s => s.seq.join('') === cur);
+    if (sp) {
+      if (state.mana < sp.mana) return { blocked: 'mana' };
+      castSpellById(sp.id);
+      state.runeSeq = [];
+      return { cast: true, id: sp.id };
+    }
+    return null;
+  }
+  function clearRuneSeq() { state.runeSeq = []; }
+  function toggleAutoCast(id) {
+    if (!has('auto-ritual')) return;
+    state.autoCast = state.autoCast || {};
+    state.autoCast[id] = !state.autoCast[id];
+    if (state.autoCast[id]) castSpellById(id);   // cast once immediately
   }
   function growthSpeed() {
-    return 1 + (state.prestigePoints || 0) * CONFIG.prestigeSpeedPer + (has('thurible') ? CONFIG.thuribleHaste : 0);
+    return 1 + (state.prestigePoints || 0) * CONFIG.prestigeSpeedPer
+      + (has('thurible') ? CONFIG.thuribleHaste : 0)
+      + (state.hasteStacks || 0) * CONFIG.hasteStackPct;
   }
   function effGrow(seed) { return seed.grow / growthSpeed(); }
   function speed() { return state.gameSpeed || 1; }        // selector level ×1…×10
@@ -167,7 +203,7 @@ const Game = (() => {
 
   /* ---------- state setup ---------- */
   function makePlanter() { return { seed: null, prog: 0, repeat: false, lastSeed: null }; }
-  function makeCandle() { return { lit: false, rune: RUNES[0].id }; }
+  function makeCandle() { return { lit: false }; }
   function freshState() {
     return {
       cents: CONFIG.startCents,
@@ -180,7 +216,10 @@ const Game = (() => {
       planters: [makePlanter()],
       candles: [makeCandle(), makeCandle(), makeCandle(), makeCandle()],
       mana: 0,
-      discovered: [],
+      discovered: ['rite_fdsa'],       // the first rite is given for free
+      hasteStacks: 0,
+      runeSeq: [], runeSeqAt: 0,
+      autoCast: {},
       notes: {},
       hpBought: 0, cashLootBought: 0, manaLootBought: 0,
       combat: null,
@@ -269,43 +308,11 @@ const Game = (() => {
     return true;
   }
 
-  /* ---------- ritual: candles, runes, spells ---------- */
+  /* ---------- candles (tap to light) ---------- */
   function toggleCandle(i) {
     const c = state.candles[i];
     if (!c || i >= candleCount()) return;
     c.lit = !c.lit;
-  }
-  function setRune(i, runeId) {
-    const c = state.candles[i];
-    if (!c || i >= candleCount() || !RUNES_BY_ID[runeId]) return;
-    c.rune = runeId;
-    c.lit = true;            // choosing a rune lights the candle
-  }
-  function cycleRune(i) {
-    const c = state.candles[i];
-    if (!c || i >= candleCount()) return;
-    const idx = RUNES.findIndex(r => r.id === c.rune);
-    c.rune = RUNES[(idx + 1) % RUNES.length].id;
-    c.lit = true;
-  }
-
-  function castRitual() {
-    if (!ritualReady()) return null;
-    const rite = activeRite();
-    if (state.mana < rite.mana) return { blocked: true, reason: 'mana', need: rite.mana };
-    state.mana -= rite.mana;
-
-    if (rite.effect === 'halveRemaining') {
-      state.planters.forEach(p => {
-        if (p.seed && !isGrown(p)) {
-          const g = effGrow(SEEDS_BY_ID[p.seed]);
-          p.prog += (g - p.prog) * CONFIG.ritualHalve;   // advance halfway to ripe
-        }
-      });
-    }
-    // remember that this rite was performed (for the Notebook), effect still hidden
-    if (!state.discovered.includes(rite.id)) state.discovered.push(rite.id);
-    return { cast: true, id: rite.id };
   }
 
   /* ---------- combat / expeditions ---------- */
@@ -427,6 +434,12 @@ const Game = (() => {
     if (dt > 10) { applyOffline(); return; } // a real gap (sleep/close) → real-time offline path
     state.lastTick = t;
     checkDailyReset();
+    // rune sequence auto-clears after a while of no taps
+    if (state.runeSeq && state.runeSeq.length && (t - (state.runeSeqAt || 0)) / 1000 > CONFIG.runeSeqTimeout) state.runeSeq = [];
+    // auto-ritual: auto-cast enabled rites while mana allows
+    if (has('auto-ritual') && state.autoCast) {
+      for (const id in state.autoCast) if (state.autoCast[id]) castSpellById(id);
+    }
     const sdt = dt * speedFactor();       // sped-up game seconds this frame
     state.mana += manaRegenPerSec() * sdt;
     const inc = ledgerPerSec(false) * sdt; if (inc > 0) earn(inc);
@@ -458,6 +471,7 @@ const Game = (() => {
   function applyOffline() {
     const t = now();
     checkDailyReset();                          // daily quests can roll over while away
+    state.runeSeq = [];                          // an in-progress rune tap resets after a gap
     let dt = (t - state.lastTick) / 1000;
     if (dt <= 1) { state.lastTick = t; return null; }
     dt = Math.min(dt, CONFIG.offlineCapSeconds);
@@ -501,7 +515,13 @@ const Game = (() => {
         state = Object.assign(freshState(), JSON.parse(raw));
         state.items = Object.assign({ planter: 0, candle: 0, map: 0, notebook: 0 }, state.items || {});
         if (typeof state.mana !== 'number') state.mana = 0;
-        if (!Array.isArray(state.discovered)) state.discovered = [];
+        // migrate rituals to the sequence system
+        state.discovered = (Array.isArray(state.discovered) ? state.discovered : []).filter(id => SPELLS_BY_ID[id]);
+        if (!state.discovered.includes('rite_fdsa')) state.discovered.unshift('rite_fdsa');
+        if (typeof state.hasteStacks !== 'number') state.hasteStacks = 0;
+        if (!Array.isArray(state.runeSeq)) state.runeSeq = [];
+        if (typeof state.runeSeqAt !== 'number') state.runeSeqAt = 0;
+        if (!state.autoCast || typeof state.autoCast !== 'object') state.autoCast = {};
         if (!state.notes || typeof state.notes !== 'object') state.notes = {};
         if (!Array.isArray(state.trinkets)) state.trinkets = [];
         ['hpBought', 'cashLootBought', 'manaLootBought', 'prestigePoints', 'hpBonus', 'scrolls', 'dailyHarvests', 'dailyResetAt'].forEach(k => { if (typeof state[k] !== 'number') state[k] = 0; });
@@ -556,13 +576,12 @@ const Game = (() => {
     manaRegenPerSec, ritualManaCost, has, tabUnlocked, avgPlantedSell, ledgerPerSec, autoHarvest,
     maxHp, hpAdded, cashLootPct, manaLootPct, fieldCost, fieldNextAmount,
     itemPrice, itemStockLeft, itemSoldOut, nextLockedSeed,
-    ritualUnlocked, candleCount,
-    ritualReady, canCastRitual, activeRite, castRitual,
+    ritualUnlocked, candleCount, toggleCandle,
+    allCandlesLit, runeSeqStr, tapRune, clearRuneSeq, castSpellById, toggleAutoCast,
     combat, startExpedition, togglePause, buyField, collectLoot, dismissDeath, shieldTier,
     prestigeUnlocked, pendingPrestige, prestigePoints, doPrestige,
     dailyActive, dailyTimeLeft, questProgress, questClaimable, claimQuest, allQuestsClaimed,
-    plant, sell, replantSpot, toggleRepeat, buyItem,
-    toggleCandle, setRune, cycleRune, setNote,
+    plant, sell, replantSpot, toggleRepeat, buyItem, setNote,
     isGrown, progress, timeLeft,
     tick, applyOffline, save, load, reset,
     SEEDS, ITEMS, TABS, RUNES, SPELLS, AREAS, FIELD_UPGRADES, AREAS_BY_ID, PATCH_NOTES, DAILY_QUESTS,
