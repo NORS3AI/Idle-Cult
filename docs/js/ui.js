@@ -191,7 +191,7 @@ const UI = (() => {
     }
     G().planters.forEach((p, i) => {
       const rep = `<button class="btn icon-btn repeat ${p.repeat ? 'on' : ''}" data-repeat="${i}" title="Save this spot — keep replanting this crop">⟳</button>`;
-      if (p.seed) {
+      if (p.seed && Game.SEEDS_BY_ID[p.seed]) {
         const seed = Game.SEEDS_BY_ID[p.seed];
         const grown = Game.isGrown(p);
         const badge = p.riteCount > 0 ? ` <span class="rite-badge">⏱ ${riteVal(p.riteCount)}</span>` : '';
@@ -202,7 +202,7 @@ const UI = (() => {
             ${rep}
             <button class="btn ${grown ? '' : 'disabled'}" data-sell="${i}">Sell</button>
           </div>`;
-      } else if (p.repeat && p.lastSeed) {
+      } else if (p.repeat && p.lastSeed && Game.SEEDS_BY_ID[p.lastSeed]) {
         const seed = Game.SEEDS_BY_ID[p.lastSeed];
         html += `<div class="row planter empty saved" data-i="${i}">
             <div class="icon-box faded">${seed.icon}</div>
