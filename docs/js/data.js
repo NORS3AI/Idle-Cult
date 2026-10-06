@@ -322,6 +322,7 @@ const PATCH_NOTES = [
     'The area picker now shows how long each expedition takes at ×1 next to its visit cost.',
     'Ritual Slate fix: it no longer needs the map — it unlocks once all four candles are set.',
     'The game now version-tags its files so a browser can\'t load a stale mix after an update (fixes "the page won\'t load" after a new release — a hard refresh clears any old copy).',
+    'Fixed a save-data crash: an old save holding a crop, trinket or expedition that no longer exists would load the shell but leave the game blank. Such leftovers are now cleaned on load instead of halting the page.',
   ] },
   { v: '2.0', title: 'Expedition loot colours & Dulling fix', items: [
     'Expedition loot now reads in colour — cash in green, mana in blue.',

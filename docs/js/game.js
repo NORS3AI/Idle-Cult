@@ -588,6 +588,7 @@ const Game = (() => {
     for (const p of state.planters) {
       if (!p.seed) continue;
       const seed = SEEDS_BY_ID[p.seed];
+      if (!seed) { p.seed = null; p.prog = 0; continue; }   // guard: unknown/stale seed id
       const g = effGrow(seed);
       p.prog += dt;
       if (p.prog < g) continue;                    // still growing
@@ -633,19 +634,34 @@ const Game = (() => {
     if (!Array.isArray(s.runeSeq)) s.runeSeq = [];
     if (!s.notes || typeof s.notes !== 'object') s.notes = {};
     if (!s.trinkets || typeof s.trinkets !== 'object' || Array.isArray(s.trinkets)) s.trinkets = {};
-    if (!s.activeTrinket || typeof s.activeTrinket !== 'object') s.activeTrinket = {};
+    // drop trinkets that no longer exist in the data (renamed/removed between versions)
+    Object.keys(s.trinkets).forEach(id => { if (!TRINKETS_BY_ID[id] || !(s.trinkets[id] > 0)) delete s.trinkets[id]; });
+    if (!s.activeTrinket || typeof s.activeTrinket !== 'object' || Array.isArray(s.activeTrinket)) s.activeTrinket = {};
+    Object.keys(s.activeTrinket).forEach(loc => { const id = s.activeTrinket[loc]; if (!id || !TRINKETS_BY_ID[id] || !s.trinkets[id]) delete s.activeTrinket[loc]; });
     ['hasteStacks', 'runeSeqAt', 'hpBought', 'cashLootBought', 'manaLootBought', 'prestigePoints', 'hpBonus', 'scrolls', 'dailyHarvests', 'dailyResetAt', 'blood']
       .forEach(k => { if (typeof s[k] !== 'number') s[k] = 0; });
     ['prestigeUnlocked', 'devMode', 'hasPrestiged'].forEach(k => { if (typeof s[k] !== 'boolean') s[k] = false; });
     if (typeof s.autoHarvestOn !== 'boolean') s.autoHarvestOn = true;
     if (!Array.isArray(s.questClaimed) || s.questClaimed.length !== DAILY_QUESTS.length) s.questClaimed = DAILY_QUESTS.map(() => false);
+    // drop an in-progress expedition whose location no longer exists
+    if (s.combat && !AREAS_BY_ID[s.combat.areaId]) s.combat = null;
     if (s.combat === undefined) s.combat = null;
     if (!(s.gameSpeed >= 1 && s.gameSpeed <= CONFIG.maxSpeed)) s.gameSpeed = 1;
     if (!Array.isArray(s.planters) || !s.planters.length) s.planters = [makePlanter()];
-    s.planters = s.planters.map(p => { const np = Object.assign(makePlanter(), p); if (typeof np.prog !== 'number') np.prog = 0; delete np.start; return np; });
+    s.planters = s.planters.map(p => {
+      const np = Object.assign(makePlanter(), p);
+      if (typeof np.prog !== 'number') np.prog = 0;
+      // scrub seeds that no longer exist so load/render/offline can't crash on them
+      if (np.seed != null && !SEEDS_BY_ID[np.seed]) { np.seed = null; np.prog = 0; np.riteCount = 0; }
+      if (np.lastSeed != null && !SEEDS_BY_ID[np.lastSeed]) np.lastSeed = null;
+      delete np.start;
+      return np;
+    });
     if (!Array.isArray(s.candles) || s.candles.length !== 4) s.candles = [makeCandle(), makeCandle(), makeCandle(), makeCandle()];
     s.candles = s.candles.map(c => ({ lit: !!(c && c.lit) }));
-    if (!Array.isArray(s.unlockedSeeds) || !s.unlockedSeeds.length) s.unlockedSeeds = ['radish'];
+    if (!Array.isArray(s.unlockedSeeds)) s.unlockedSeeds = [];
+    s.unlockedSeeds = s.unlockedSeeds.filter(id => SEEDS_BY_ID[id]);   // drop unknown seed ids
+    if (!s.unlockedSeeds.includes('radish')) s.unlockedSeeds.unshift('radish');
     if (typeof s.lastTick !== 'number') s.lastTick = now();
     return s;
   }
