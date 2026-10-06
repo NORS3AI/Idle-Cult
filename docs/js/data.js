@@ -321,6 +321,7 @@ const PATCH_NOTES = [
     'Expedition speeds are now fixed endpoints: ×1 is the full length, ×10 is the set time (Dulling 1s, Blacktide 19s, Cathedral 37s, Windsor 66s, Bright 99s, Forgotten 145s, Void 250s); ×2–×9 fall in between.',
     'The area picker now shows how long each expedition takes at ×1 next to its visit cost.',
     'Ritual Slate fix: it no longer needs the map — it unlocks once all four candles are set.',
+    'The game now version-tags its files so a browser can\'t load a stale mix after an update (fixes "the page won\'t load" after a new release — a hard refresh clears any old copy).',
   ] },
   { v: '2.0', title: 'Expedition loot colours & Dulling fix', items: [
     'Expedition loot now reads in colour — cash in green, mana in blue.',
